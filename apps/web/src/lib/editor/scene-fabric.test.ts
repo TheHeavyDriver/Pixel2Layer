@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { Canvas, Group, Path, Rect, Point, Textbox } from 'fabric';
+import { Canvas, Group, Path, Rect, Point, Textbox, filters } from 'fabric';
 
 import {
   canvasToScene,
   elementToFabric,
+  sceneFiltersToFabric,
   sceneToCanvas,
   fabricToElement,
   resolveSrc,
@@ -233,5 +234,35 @@ describe('v0.4: vectors and images', () => {
       'https://cdn.example.com/a.png',
     );
     expect(resolveSrc('data:image/png;base64,iVBOR')).toBe('data:image/png;base64,iVBOR');
+  });
+});
+
+describe('sceneFiltersToFabric', () => {
+  it('returns an empty list when no filters are set', () => {
+    expect(sceneFiltersToFabric(undefined)).toEqual([]);
+  });
+
+  it('maps each scene filter onto a fabric filter instance', () => {
+    const out = sceneFiltersToFabric({
+      brightness: 0.2,
+      contrast: 0.5,
+      saturation: -0.25,
+      grayscale: true,
+      invert: true,
+      blur: 0.1,
+    });
+
+    expect(out).toHaveLength(6);
+    expect(out[0]).toBeInstanceOf(filters.Brightness);
+    expect((out[0] as unknown as { brightness: number }).brightness).toBe(0.2);
+    expect(out[2]).toBeInstanceOf(filters.Saturation);
+    expect(out[3]).toBeInstanceOf(filters.Grayscale);
+    expect(out[4]).toBeInstanceOf(filters.Invert);
+    expect(out[5]).toBeInstanceOf(filters.Blur);
+  });
+
+  it('skips missing filters', () => {
+    const out = sceneFiltersToFabric({ invert: true });
+    expect(out).toHaveLength(1);
   });
 });

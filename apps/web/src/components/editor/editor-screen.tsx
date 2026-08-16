@@ -439,6 +439,37 @@ function Toolbar({
       <button
         type="button"
         className={btn}
+        onClick={() => {
+          void import('@/lib/api').then(async ({ suggestGroups }) => {
+            try {
+              const live = editorRef.current?.readScene() ?? scene;
+              const groups = await suggestGroups({
+                canvas: live.canvas,
+                layers: live.layers as unknown[],
+              });
+              const groupable = groups
+                .map((g) => g.elementIds)
+                .find((ids) => ids.length >= 2);
+              if (!groupable) {
+                setExportError('No suggested groups with 2+ layers');
+                return;
+              }
+              editorRef.current?.groupByIds(groupable);
+              setExportError(null);
+            } catch (e) {
+              setExportError(e instanceof Error ? e.message : 'Smart group failed.');
+            }
+          });
+        }}
+        title="Group layers into the first suggested layout group"
+        data-testid="smart-group-btn"
+      >
+        Smart group
+      </button>
+      <div className="h-5 w-px bg-bordered" />
+      <button
+        type="button"
+        className={btn}
         onClick={() => editorRef.current?.ungroupSelected()}
         title="Ungroup (Ctrl+Shift+G)"
       >

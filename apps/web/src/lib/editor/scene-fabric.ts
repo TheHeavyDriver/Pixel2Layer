@@ -12,6 +12,7 @@ import {
   Polygon,
   Rect,
   Textbox,
+  filters,
   type Object as FabricObject,
 } from 'fabric';
 
@@ -383,6 +384,7 @@ function flattenToLeaves(objects: FabricObject[], inherited: EffTransform): { ob
 
 export function applyElementToFabric(obj: FabricWithMeta, element: SceneGraphElement): void {
   const center = fabricBase(element.transform);
+  if (element.type === 'image' && obj.type !== 'image') return; // only live image objects update in place
   obj.set({
     ...center,
     angle: element.transform.rotation,
@@ -401,6 +403,11 @@ export function applyElementToFabric(obj: FabricWithMeta, element: SceneGraphEle
     lockRotation: element.locked,
     [LOCK_PROP]: element.locked,
   });
+  if (element.type === 'image') {
+    const fab = obj as FabricWithMeta & { filters?: unknown[] };
+    fab.filters = sceneFiltersToFabric(element.filters);
+    (obj as unknown as { applyFilters(): void }).applyFilters?.();
+  }
 }
 
 function fabricBase(t: Transform) {
@@ -419,6 +426,8 @@ export async function loadImageElement(
 ): Promise<FabricWithMeta | null> {
   try {
     const img = await FabricImage.fromURL(resolveSrc(element.src), { crossOrigin: 'anonymous' });
+    img.filters = sceneFiltersToFabric(element.filters);
+    img.applyFilters();
     img.set({
       left: element.transform.x,
       top: element.transform.y,
@@ -466,4 +475,19 @@ function segmentsToPathString(segments: unknown): string {
 
 function round(n: number): string {
   return String(Math.round(n * 1000) / 1000);
+}
+
+/** Map scene-graph image filters onto Fabric filter instances. */
+export function sceneFiltersToFabric(
+  f?: Extract<SceneGraphElement, { type: 'image' }>['filters'],
+): InstanceType<typeof filters.BaseFilter<string>>[] {
+  const out: InstanceType<typeof filters.BaseFilter<string>>[] = [];
+  if (!f) return out;
+  if (f.brightness) out.push(new filters.Brightness({ brightness: f.brightness })) as never;
+  if (f.contrast) out.push(new filters.Contrast({ contrast: f.contrast })) as never;
+  if (f.saturation) out.push(new filters.Saturation({ saturation: f.saturation })) as never;
+  if (f.grayscale) out.push(new filters.Grayscale({ mode: 'luminosity' })) as never;
+  if (f.invert) out.push(new filters.Invert()) as never;
+  if (f.blur) out.push(new filters.Blur({ blur: f.blur })) as never;
+  return out;
 }

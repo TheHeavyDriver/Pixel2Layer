@@ -106,6 +106,7 @@ class ImageElement(ElementBase):
     width: float
     height: float
     crop: dict | None = None
+    filters: dict | None = Field(None, alias="filters")
 
 
 SceneGraphElement = (  # exported for type hints; pydantic discriminator below

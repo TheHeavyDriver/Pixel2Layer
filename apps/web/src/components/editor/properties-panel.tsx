@@ -359,6 +359,10 @@ export function PropertiesPanel({
       );
     }
 
+    if (el.type === 'image') {
+      return <ImageControls element={el} onUpdateElement={onUpdateElement} />;
+    }
+
     return (
       <Section title="Fill">
         <FillControls element={el} onUpdateElement={onUpdateElement} styleKey="fill" />
@@ -482,6 +486,115 @@ function FillControls({
           className="h-7 w-full accent-[var(--accent)]"
         />
       </Field>
+    </>
+  );
+}
+
+// -- image layer tools (v0.6 backlog) ----------------------------------------
+
+function ImageControls({
+  element,
+  onUpdateElement,
+}: {
+  element: Extract<SceneGraphElement, { type: 'image' }>;
+  onUpdateElement: (id: string, patch: Partial<SceneGraphElement>) => void;
+}) {
+  const [removing, setRemoving] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+  const filters = element.filters ?? {};
+
+  const setFilter = (
+    key: 'brightness' | 'contrast' | 'saturation' | 'grayscale' | 'invert' | 'blur',
+    value: number | boolean,
+  ) => onUpdateElement(element.id, { filters: { ...filters, [key]: value } } as Partial<SceneGraphElement>);
+
+  async function handleRemoveBackground() {
+    setRemoving(true);
+    setRemoveError(null);
+    try {
+      const { removeBackground } = await import('@/lib/api');
+      const { resolveSrc } = await import('@/lib/editor/scene-fabric');
+      const blob = await (await fetch(resolveSrc(element.src))).blob();
+      const result = await removeBackground(blob);
+      onUpdateElement(element.id, {
+        src: result.url,
+        width: result.width,
+        height: result.height,
+        filters: undefined,
+      } as Partial<SceneGraphElement>);
+    } catch (e) {
+      setRemoveError(e instanceof Error ? e.message : 'Background removal failed.');
+    } finally {
+      setRemoving(false);
+    }
+  }
+
+  const slider = (label: string, key: 'brightness' | 'contrast' | 'saturation' | 'blur', min = -100, max = 100) => {
+    const val = typeof filters[key] === 'number' ? (filters[key] as number) : 0;
+    return (
+      <Field label={label}>
+        <input
+          type="range"
+          min={min}
+          max={max}
+          value={Math.round(val * 100)}
+          onChange={(e) => setFilter(key, Number(e.target.value) / 100)}
+          className="h-7 w-full accent-[var(--accent)]"
+        />
+      </Field>
+    );
+  };
+
+  const toggle = (label: string, key: 'grayscale' | 'invert') => (
+    <label className="mb-2 flex items-center justify-between gap-2 last:mb-0">
+      <span className="w-16 shrink-0 text-[12px] text-secondary">{label}</span>
+      <input
+        type="checkbox"
+        checked={Boolean(filters[key])}
+        onChange={(e) => setFilter(key, e.target.checked)}
+        className="h-4 w-4 accent-[var(--accent)]"
+      />
+    </label>
+  );
+
+  return (
+    <>
+      <Section title="Adjust">
+        {slider('Brightness', 'brightness')}
+        {slider('Contrast', 'contrast')}
+        {slider('Saturation', 'saturation', -100, 100)}
+        {slider('Blur', 'blur', 0, 20)}
+        <div className="mt-1 flex items-center justify-between border-t border-bordered pt-2">
+          {toggle('Grayscale', 'grayscale')}
+          {toggle('Invert', 'invert')}
+        </div>
+        <button
+          type="button"
+          className="mt-2 h-7 rounded-md border border-bordered bg-raised px-2 text-[11px] font-medium text-secondary transition-colors hover:bg-raised"
+          onClick={() => onUpdateElement(element.id, { filters: undefined } as Partial<SceneGraphElement>)}
+        >
+          Reset filters
+        </button>
+      </Section>
+      <Section title="Background">
+        <button
+          type="button"
+          className="h-8 w-full rounded-[8px] bg-accent text-[12px] font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-40"
+          onClick={() => void handleRemoveBackground()}
+          disabled={removing}
+          data-testid="remove-bg-btn"
+        >
+          {removing ? 'Removing…' : 'Remove background'}
+        </button>
+        {removeError && (
+          <p className="mt-1 text-[11px] text-danger" role="alert">
+            {removeError}
+          </p>
+        )}
+        <p className="mt-1 text-[11px] text-muted">
+          Approximate foreground cutout (OpenCV segmentation).
+        </p>
+      </Section>
     </>
   );
 }

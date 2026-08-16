@@ -6,6 +6,8 @@ import {
   exportScene,
   getJob,
   importProjectP2l,
+  removeBackground,
+  suggestGroups,
   uploadImage,
 } from '@/lib/api';
 
@@ -79,6 +81,44 @@ describe('api client', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ detail: 'Not found' }, 404));
 
     await expect(getJob('missing')).rejects.toThrow('Job lookup failed (404)');
+  });
+
+  it('removeBackground posts the file and returns the masked result', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ url: '/api/storage/assets/bg-removal-1.png', key: 'assets/bg-removal-1.png', width: 400, height: 300 }, 200),
+    );
+
+    const out = await removeBackground(new Blob(['png'], { type: 'image/png' }));
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${API_BASE}/api/tools/background-removal`);
+    expect(init.method).toBe('POST');
+    expect((init.body as FormData).get('file')).toBeInstanceOf(Blob);
+    expect(out.key).toBe('assets/bg-removal-1.png');
+    expect(out.width).toBe(400);
+  });
+
+  it('suggestGroups sends the scene and returns suggestions', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ groups: [{ name: 'header', elementIds: ['a', 'b'] }] }, 200),
+    );
+
+    const out = await suggestGroups({
+      canvas: { width: 300, height: 200, background: '#fff' },
+      layers: [],
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(String(init.body));
+    expect(init.method).toBe('POST');
+    expect(body.scene.canvas.width).toBe(300);
+    expect(out).toEqual([{ name: 'header', elementIds: ['a', 'b'] }]);
+  });
+
+  it('removeBackground throws on a non-2xx response', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ detail: 'No foreground found' }, 422));
+
+    await expect(removeBackground(new Blob(['x']))).rejects.toThrow('No foreground found');
   });
 });
 

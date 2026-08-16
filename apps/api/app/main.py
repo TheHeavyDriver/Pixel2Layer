@@ -15,6 +15,7 @@ from app.api.routes import (
     sharing,
     storage,
     templates,
+    tools,
     upload,
 )
 from app.core.config import Settings, get_settings
@@ -81,6 +82,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(sharing.router)
     app.include_router(templates.router)
     app.include_router(batches.router)
+    app.include_router(tools.router)
 
     @app.get("/api/health", response_model=HealthResponse, tags=["health"])
     async def health() -> HealthResponse:

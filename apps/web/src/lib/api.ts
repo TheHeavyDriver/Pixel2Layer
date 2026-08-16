@@ -498,3 +498,59 @@ export async function createBatch(uploadIds: string[]): Promise<Batch> {
 export async function getBatch(batchId: string): Promise<Batch> {
   return authFetch<Batch>(`/api/batches/${batchId}`);
 }
+
+// -- tools (v0.6 backlog) ---------------------------------------------------
+
+export interface BackgroundRemovalResult {
+  url: string;
+  key: string;
+  width: number;
+  height: number;
+}
+
+export interface GroupSuggestion {
+  name: string;
+  elementIds: string[];
+}
+
+/** Remove the background of an image; returns a stored masked cutout. */
+export async function removeBackground(file: Blob): Promise<BackgroundRemovalResult> {
+  const form = new FormData();
+  form.append('file', file, 'image.png');
+  const res = await fetch(`${API_BASE}/api/tools/background-removal`, {
+    method: 'POST',
+    body: form,
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => null);
+    throw new Error(detail?.detail ?? `Background removal failed (${res.status})`);
+  }
+  return res.json();
+}
+
+/** Ask the API for smart layer-grouping suggestions on a scene graph. */
+export async function suggestGroups(scene: {
+  canvas: { width: number; height: number; background: string | null };
+  layers: unknown[];
+}): Promise<GroupSuggestion[]> {
+  const body = {
+    scene: {
+      schemaVersion: 1,
+      canvas: scene.canvas,
+      layers: scene.layers,
+      confidence: {},
+      overallConfidence: 1,
+    },
+  };
+  const res = await fetch(`${API_BASE}/api/tools/grouping`, {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => null);
+    throw new Error(detail?.detail ?? `Grouping failed (${res.status})`);
+  }
+  const parsed = (await res.json()) as { groups: GroupSuggestion[] };
+  return parsed.groups;
+}

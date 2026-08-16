@@ -26,6 +26,7 @@ import {
 export interface CanvasEditorHandle {
   selectByIds(ids: string[]): void;
   groupSelected(): void;
+  groupByIds(ids: string[]): void;
   ungroupSelected(): void;
   duplicateSelected(): void;
   deleteSelected(): void;
@@ -194,6 +195,22 @@ export const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
             const group = new Group(active, { canvas });
             canvas.add(group);
             canvas.setActiveObject(group);
+            canvas.requestRenderAll();
+            readAndSync();
+          },
+
+          groupByIds(ids: string[]) {
+            const canvas = fabricRef.current;
+            if (!canvas) return;
+            const objs = canvas.getObjects().filter((o) => {
+              const item = o as FabricWithMeta;
+              return ids.includes(item.p2lId ?? '');
+            });
+            if (objs.length < 2) return;
+            canvas.discardActiveObject();
+            canvas.remove(...objs);
+            const group = new Group(objs, { canvas });
+            canvas.add(group);
             canvas.requestRenderAll();
             readAndSync();
           },

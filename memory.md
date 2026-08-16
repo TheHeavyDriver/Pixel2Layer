@@ -59,10 +59,14 @@ Brief change log. Read first each session; append a short entry after every comm
 | 51 | 2026-08-16 | `implement v0.5` | apps/web/e2e/v05-flow.spec.ts | Playwright e2e: sharing create→open→revoke, template save→gallery→reuse + PDF export; home "Get started"→"Upload an image" button update in existing specs |
 | 52 | 2026-08-16 | `verify` | apps/api apps/web | 86 pytest + 45 vitest + 4 Playwright e2e pass; tsc + next build green; ruff clean — v0.5 exit criteria met (share/edit/revoke, template gallery start, batch, PDF) |
 | 53 | 2026-08-16 | `commit` | — | v0.5 milestone: sharing, templates, batch processing, PDF export |
+| 54 | 2026-08-16 | `implement v0.6 tools` | apps/api/app/services/grouping.py, app/api/routes/tools.py, app/main.py, app/schemas/scene_graph.py, tests/test_grouping.py, tests/test_tools_routes.py | Backend: LayerGrouper (band-cluster → header/footer/hero/products/decorations/content labels); tools router: POST /api/tools/background-removal (masked PNG under assets/) + /api/tools/grouping; ImageElement.filters field; +11 pytest → 97 |
+| 55 | 2026-08-16 | `implement v0.6 tools` | packages/schema/src/index.ts, apps/web/src/lib/api.ts, apps/web/src/lib/editor/scene-fabric.ts, apps/web/src/components/editor/{editor-screen,canvas-editor,properties-panel}.tsx, lib/api.test.ts, editor/scene-fabric.test.ts | Web: ImageElement.filters type; removeBackground+suggestGroups api helpers; sceneFiltersToFabric mapping (brightness/contrast/saturation/grayscale/invert/blur); loadImageElement/applyElementToFabric apply filters; groupByIds handle + Smart group toolbar action; ImageControls in properties panel (filters sliders/toggles/reset + background-removal button); +6 vitest → 51 |
+| 56 | 2026-08-16 | `verify` | apps/api apps/web | 97 pytest + 51 vitest + tsc + next build green; ruff clean |
+| 57 | 2026-08-16 | `document` | roadmap.md, README.md | Marked v0.4 harder-image + new image tools/smart grouping done; pruned done backlog items; wrote full README (architecture, setup, test) |
 
 ## Files
 
-- `README.md` — stub (unchanged)
+- `README.md` — full project readme (architecture, setup, test, roadmap)
 - `description.md` — original spec (unchanged)
 - `prd.md`, `roadmap.md`, `architecture.md`, `frontend-design.md` — created
 - `memory.md` — this log

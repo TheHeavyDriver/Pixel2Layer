@@ -114,6 +114,15 @@ export interface ImageElement extends ElementBase {
   width: number;
   height: number;
   crop?: { x: number; y: number; width: number; height: number };
+  /** per-element image adjustments (v0.6 editor backlog) */
+  filters?: {
+    brightness?: number;
+    contrast?: number;
+    saturation?: number;
+    grayscale?: boolean;
+    invert?: boolean;
+    blur?: number;
+  };
 }
 
 export type SceneGraphElement =

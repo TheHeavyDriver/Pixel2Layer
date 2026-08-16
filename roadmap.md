@@ -58,7 +58,9 @@ Goal: handle logos/illustrations/photographs and make reconstruction quality tra
 - [x] **ConfidenceScorer** full UI — per-element confidence badges + overall reconstruction summary
 - [x] Progressive reconstruction strategy — route simple vs complex images appropriately
 - [x] Vector path editing controls in PropertiesPanel
-- [~] Harder-image handling: crops of silhouettes, logos on photos, text on complex backgrounds (progressive router + confidence notes; deep-tuning deferred to backlog)
+- [x] Harder-image handling: crops of silhouettes, logos on photos, text on complex backgrounds (progressive router + confidence notes; deep-tuning deferred to backlog)
+- [x] Image editing tools in the editor — filters (brightness/contrast/saturation/grayscale/invert/blur), background removal
+- [x] Smart layer grouping — group headers, hero sections, products, decorations into labelled layers
 
 **Exit criteria:** logos and simple illustrations reconstruct as editable vectors, photos segment into editable regions with clear confidence labeling, and complex images degrade gracefully.
 
@@ -87,9 +89,7 @@ Ideas tracked for later, in priority order:
 - [ ] Advanced vector reconstruction of complex illustrations
 - [ ] Deeper SAM 2 fine-tuning for design-graphic segmentation quality
 - [ ] Font database expansion + better font matching
-- [ ] Smart layer grouping (headers, hero sections, products, decorations)
-- [ ] Background removal as a first-class tool
-- [ ] Advanced image editing (crop, masks, filters) on segmented regions
+- [ ] Advanced image editing (masks, region cropping) on segmented regions
 - [ ] Plugin SDK / component system / design-system features (auto-layout)
 - [ ] Marketplace, templates monetization
 
