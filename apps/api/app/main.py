@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from app.api.routes import jobs, upload
+from app.api.routes import export, jobs, upload
 from app.core.config import Settings, get_settings
 from app.services.job_queue import JobQueue, build_repository
 from app.services.pipeline_worker import build_worker
@@ -58,6 +58,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(upload.router)
     app.include_router(jobs.router)
+    app.include_router(export.router)
 
     @app.get("/api/health", response_model=HealthResponse, tags=["health"])
     async def health() -> HealthResponse:

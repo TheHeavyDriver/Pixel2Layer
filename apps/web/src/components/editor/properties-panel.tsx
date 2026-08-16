@@ -1,0 +1,517 @@
+'use client';
+
+import { useState, type ReactNode } from 'react';
+
+import type { SceneGraph, SceneGraphElement } from '@pixel2layer/schema';
+
+interface PropertiesPanelProps {
+  scene: SceneGraph;
+  selectedIds: string[];
+  onUpdateElement: (id: string, patch: Partial<SceneGraphElement>) => void;
+  onUpdateCanvas: (patch: Partial<SceneGraph['canvas']>) => void;
+}
+
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="border-b border-bordered px-3 py-3">
+      <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-muted">
+        {title}
+      </h3>
+      {children}
+    </section>
+  );
+}
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="mb-2 flex items-center justify-between gap-2 last:mb-0">
+      <span className="w-16 shrink-0 text-[12px] text-secondary">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+const num = (v: string) => (v === '' ? NaN : Number(v));
+
+export function PropertiesPanel({
+  scene,
+  selectedIds,
+  onUpdateElement,
+  onUpdateCanvas,
+}: PropertiesPanelProps) {
+  const selected = scene.layers.filter((l) => selectedIds.includes(l.id));
+  const primary = selected[0];
+  const multi = selected.length > 1;
+
+  // -- shared transform readout -----------------------------------------------
+  function transformOn(el: SceneGraphElement) {
+    return (
+      <Section title="Transform">
+        <Field label="X">
+          <input
+            type="number"
+            value={Math.round(el.transform.x)}
+            onChange={(e) => {
+              const v = num(e.target.value);
+              if (Number.isFinite(v)) onUpdateElement(el.id, { transform: { ...el.transform, x: v } });
+            }}
+            className="h-7 w-[72px] rounded-md border border-bordered bg-raised px-2 text-right font-mono text-[12px] focus:border-bordered-strong focus:outline-none"
+          />
+        </Field>
+        <Field label="Y">
+          <input
+            type="number"
+            value={Math.round(el.transform.y)}
+            onChange={(e) => {
+              const v = num(e.target.value);
+              if (Number.isFinite(v)) onUpdateElement(el.id, { transform: { ...el.transform, y: v } });
+            }}
+            className="h-7 w-[72px] rounded-md border border-bordered bg-raised px-2 text-right font-mono text-[12px] focus:border-bordered-strong focus:outline-none"
+          />
+        </Field>
+        <Field label="Rotation">
+          <input
+            type="number"
+            value={Math.round(el.transform.rotation)}
+            onChange={(e) => {
+              const v = num(e.target.value);
+              if (Number.isFinite(v)) onUpdateElement(el.id, { transform: { ...el.transform, rotation: v } });
+            }}
+            className="h-7 w-[72px] rounded-md border border-bordered bg-raised px-2 text-right font-mono text-[12px] focus:border-bordered-strong focus:outline-none"
+          />
+        </Field>
+        <Field label="Opacity">
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={Math.round(el.opacity * 100)}
+            onChange={(e) => onUpdateElement(el.id, { opacity: Number(e.target.value) / 100 })}
+            className="h-7 w-full accent-[var(--accent)]"
+          />
+        </Field>
+      </Section>
+    );
+  }
+
+  function renderSingle(el: SceneGraphElement): React.ReactNode {
+    if (el.type === 'text') {
+      return (
+        <>
+          <Section title="Content">
+            <textarea
+              value={el.content}
+              rows={2}
+              onChange={(e) => onUpdateElement(el.id, { content: e.target.value })}
+              className="w-full resize-y rounded-md border border-bordered bg-raised p-2 font-mono text-[13px] leading-snug text-primary focus:border-bordered-strong focus:outline-none"
+              aria-label="Text content"
+            />
+          </Section>
+          <Section title="Font">
+            <Field label="Family">
+              <select
+                value={el.fontFamily}
+                onChange={(e) => onUpdateElement(el.id, { fontFamily: e.target.value })}
+                className="h-7 w-full rounded-md border border-bordered bg-raised px-2 text-[12px] text-primary focus:border-bordered-strong focus:outline-none"
+              >
+                <option value="sans-serif">Sans-serif</option>
+                <option value="Arial">Arial</option>
+                <option value="Georgia">Georgia</option>
+                <option value="monospace">Monospace</option>
+                <option value="Impact">Impact</option>
+              </select>
+            </Field>
+            <Field label="Size">
+              <input
+                type="number"
+                value={el.fontSize}
+                onChange={(e) => {
+                  const v = num(e.target.value);
+                  if (Number.isFinite(v) && v > 0) onUpdateElement(el.id, { fontSize: v });
+                }}
+                className="h-7 w-[72px] rounded-md border border-bordered bg-raised px-2 text-right font-mono text-[12px] focus:border-bordered-strong focus:outline-none"
+              />
+            </Field>
+            <Field label="Weight">
+              <input
+                type="range"
+                min={100}
+                max={900}
+                step={100}
+                value={el.fontWeight}
+                onChange={(e) => onUpdateElement(el.id, { fontWeight: Number(e.target.value) })}
+                className="h-7 w-full accent-[var(--accent)]"
+              />
+            </Field>
+            <Field label="Align">
+              <div className="flex gap-1">
+                {(['left', 'center', 'right'] as const).map((a) => (
+                  <button
+                    key={a}
+                    type="button"
+                    onClick={() => onUpdateElement(el.id, { textAlign: a })}
+                    className={`h-7 flex-1 rounded-md border text-[11px] capitalize transition-colors ${
+                      (el.textAlign ?? 'left') === a
+                        ? 'border-accent bg-accent/10 text-primary'
+                        : 'border-bordered bg-raised text-secondary hover:bg-raised'
+                    }`}
+                  >
+                    {a}
+                  </button>
+                ))}
+              </div>
+            </Field>
+          </Section>
+          <Section title="Text Color">
+            <FillControls element={el} onUpdateElement={onUpdateElement} styleKey="fill" />
+          </Section>
+        </>
+      );
+    }
+
+    if (el.type === 'rectangle') {
+      return (
+        <>
+          <Section title="Fill">
+            <FillControls element={el} onUpdateElement={onUpdateElement} styleKey="fill" />
+          </Section>
+          <Section title="Geometry">
+            <Field label="Width">
+              <input
+                type="number"
+                value={el.width}
+                onChange={(e) => {
+                  const v = num(e.target.value);
+                  if (Number.isFinite(v) && v > 0) onUpdateElement(el.id, { width: v });
+                }}
+                className="h-7 w-[72px] rounded-md border border-bordered bg-raised px-2 text-right font-mono text-[12px] focus:border-bordered-strong focus:outline-none"
+              />
+            </Field>
+            <Field label="Height">
+              <input
+                type="number"
+                value={el.height}
+                onChange={(e) => {
+                  const v = num(e.target.value);
+                  if (Number.isFinite(v) && v > 0) onUpdateElement(el.id, { height: v });
+                }}
+                className="h-7 w-[72px] rounded-md border border-bordered bg-raised px-2 text-right font-mono text-[12px] focus:border-bordered-strong focus:outline-none"
+              />
+            </Field>
+            <Field label="Radius">
+              <input
+                type="number"
+                min={0}
+                value={el.rx ?? 0}
+                onChange={(e) => {
+                  const v = Math.max(0, num(e.target.value) || 0);
+                  onUpdateElement(el.id, { rx: v, ry: v });
+                }}
+                className="h-7 w-[72px] rounded-md border border-bordered bg-raised px-2 text-right font-mono text-[12px] focus:border-bordered-strong focus:outline-none"
+              />
+            </Field>
+          </Section>
+        </>
+      );
+    }
+
+    if (el.type === 'circle') {
+      return (
+        <>
+          <Section title="Fill">
+            <FillControls element={el} onUpdateElement={onUpdateElement} styleKey="fill" />
+          </Section>
+          <Section title="Geometry">
+            <Field label="Radius">
+              <input
+                type="number"
+                min={1}
+                value={el.radius}
+                onChange={(e) => {
+                  const v = num(e.target.value);
+                  if (Number.isFinite(v) && v > 0) onUpdateElement(el.id, { radius: v });
+                }}
+                className="h-7 w-[72px] rounded-md border border-bordered bg-raised px-2 text-right font-mono text-[12px] focus:border-bordered-strong focus:outline-none"
+              />
+            </Field>
+          </Section>
+        </>
+      );
+    }
+
+    if (el.type === 'ellipse') {
+      return (
+        <>
+          <Section title="Fill">
+            <FillControls element={el} onUpdateElement={onUpdateElement} styleKey="fill" />
+          </Section>
+          <Section title="Geometry">
+            <Field label="RX">
+              <input
+                type="number"
+                min={1}
+                value={el.rx}
+                onChange={(e) => {
+                  const v = num(e.target.value);
+                  if (Number.isFinite(v) && v > 0) onUpdateElement(el.id, { rx: v });
+                }}
+                className="h-7 w-[72px] rounded-md border border-bordered bg-raised px-2 text-right font-mono text-[12px] focus:border-bordered-strong focus:outline-none"
+              />
+            </Field>
+            <Field label="RY">
+              <input
+                type="number"
+                min={1}
+                value={el.ry}
+                onChange={(e) => {
+                  const v = num(e.target.value);
+                  if (Number.isFinite(v) && v > 0) onUpdateElement(el.id, { ry: v });
+                }}
+                className="h-7 w-[72px] rounded-md border border-bordered bg-raised px-2 text-right font-mono text-[12px] focus:border-bordered-strong focus:outline-none"
+              />
+            </Field>
+          </Section>
+        </>
+      );
+    }
+
+    if (el.type === 'line') {
+      return (
+        <>
+          <Section title="Stroke">
+            <FillControls element={el} onUpdateElement={onUpdateElement} styleKey="stroke" />
+            <Field label="Width">
+              <input
+                type="number"
+                min={1}
+                value={el.strokeWidth ?? 1}
+                onChange={(e) => {
+                  const v = num(e.target.value);
+                  if (Number.isFinite(v) && v > 0) onUpdateElement(el.id, { strokeWidth: v });
+                }}
+                className="h-7 w-[72px] rounded-md border border-bordered bg-raised px-2 text-right font-mono text-[12px] focus:border-bordered-strong focus:outline-none"
+              />
+            </Field>
+          </Section>
+        </>
+      );
+    }
+
+    return (
+      <Section title="Fill">
+        <FillControls element={el} onUpdateElement={onUpdateElement} styleKey="fill" />
+      </Section>
+    );
+  }
+
+  if (selected.length === 0) {
+    return (
+      <aside
+        className="flex h-full w-[280px] flex-col overflow-y-auto border-l border-bordered bg-surface"
+        data-testid="properties-panel"
+      >
+        <CanvasProperties
+          scene={scene}
+          onUpdateCanvas={onUpdateCanvas}
+        />
+      </aside>
+    );
+  }
+
+  return (
+    <aside
+      className="flex h-full w-[280px] flex-col overflow-y-auto border-l border-bordered bg-surface"
+      data-testid="properties-panel"
+    >
+      <div className="flex h-[44px] items-center justify-between border-b border-bordered px-3">
+        <h2 className="text-[13px] font-semibold tracking-[-0.01em]">
+          {multi ? `${selected.length} elements` : primary?.name ?? 'Properties'}
+        </h2>
+      </div>
+      {!multi && primary && (
+        <div className="flex items-center gap-2 border-b border-bordered px-3 py-2">
+          <span className="rounded-md bg-raised px-2 py-0.5 font-mono text-[11px] text-secondary">
+            {primary.type}
+          </span>
+          <span
+            className={`font-mono text-[11px] ${
+              primary.confidence >= 0.8
+                ? 'text-success'
+                : primary.confidence >= 0.5
+                  ? 'text-warning'
+                  : 'text-danger'
+            }`}
+          >
+            {Math.round(primary.confidence * 100)}% confidence
+          </span>
+        </div>
+      )}
+      {!multi && primary ? renderSingle(primary) : (
+        <p className="px-3 py-4 text-[12px] text-secondary">
+          {selected.length} elements selected. Use the toolbar for align and
+          distribute.
+        </p>
+      )}
+      {!multi && primary && transformOn(primary)}
+    </aside>
+  );
+}
+
+function FillControls({
+  element,
+  onUpdateElement,
+  styleKey,
+}: {
+  element: SceneGraphElement;
+  onUpdateElement: (id: string, patch: Partial<SceneGraphElement>) => void;
+  styleKey: 'fill' | 'stroke';
+}) {
+  const value = element[styleKey] ?? '#000000';
+  const [hex, setHex] = useState(value);
+  return (
+    <>
+      <Field label="Color">
+        <div className="flex items-center gap-2">
+          <input
+            type="color"
+            value={normalizeHex(value)}
+            onChange={(e) => {
+              const next = e.target.value;
+              setHex(next);
+              onUpdateElement(element.id, { [styleKey]: next } as Partial<SceneGraphElement>);
+            }}
+            className="h-7 w-9 cursor-pointer rounded border border-bordered bg-raised p-0.5"
+            aria-label={`${styleKey} color`}
+          />
+          <input
+            value={hex}
+            onChange={(e) => setHex(e.target.value)}
+            onBlur={() => {
+              const next = normalizeHex(hex);
+              setHex(next);
+              onUpdateElement(element.id, { [styleKey]: next } as Partial<SceneGraphElement>);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                const next = normalizeHex(hex);
+                setHex(next);
+                onUpdateElement(element.id, { [styleKey]: next } as Partial<SceneGraphElement>);
+                e.currentTarget.blur();
+              }
+            }}
+            className="h-7 flex-1 rounded-md border border-bordered bg-raised px-2 font-mono text-[12px] focus:border-bordered-strong focus:outline-none"
+            aria-label={`${styleKey} hex`}
+          />
+        </div>
+      </Field>
+      <Field label="Opacity">
+        <input
+          type="range"
+          min={0}
+          max={100}
+          value={Math.round(element.opacity * 100)}
+          onChange={(e) => onUpdateElement(element.id, { opacity: Number(e.target.value) / 100 })}
+          className="h-7 w-full accent-[var(--accent)]"
+        />
+      </Field>
+    </>
+  );
+}
+
+function CanvasProperties({
+  scene,
+  onUpdateCanvas,
+}: {
+  scene: SceneGraph;
+  onUpdateCanvas: (patch: Partial<SceneGraph['canvas']>) => void;
+}) {
+  const [width, setWidth] = useState(String(scene.canvas.width));
+  const [height, setHeight] = useState(String(scene.canvas.height));
+  return (
+    <>
+      <div className="flex h-[44px] items-center border-b border-bordered px-3">
+        <h2 className="text-[13px] font-semibold tracking-[-0.01em]">Canvas</h2>
+      </div>
+      <Section title="Size">
+        <Field label="Width">
+          <input
+            type="number"
+            value={width}
+            onChange={(e) => setWidth(e.target.value)}
+            onBlur={() => {
+              const v = Number(width);
+              if (Number.isFinite(v) && v > 0) onUpdateCanvas({ width: v });
+            }}
+            className="h-7 w-full rounded-md border border-bordered bg-raised px-2 text-right font-mono text-[12px] focus:border-bordered-strong focus:outline-none"
+          />
+        </Field>
+        <Field label="Height">
+          <input
+            type="number"
+            value={height}
+            onChange={(e) => setHeight(e.target.value)}
+            onBlur={() => {
+              const v = Number(height);
+              if (Number.isFinite(v) && v > 0) onUpdateCanvas({ height: v });
+            }}
+            className="h-7 w-full rounded-md border border-bordered bg-raised px-2 text-right font-mono text-[12px] focus:border-bordered-strong focus:outline-none"
+          />
+        </Field>
+      </Section>
+      <Section title="Background">
+        <Field label="Color">
+          <input
+            type="color"
+            value={scene.canvas.background ? normalizeHex(scene.canvas.background) : '#ffffff'}
+            onChange={(e) => onUpdateCanvas({ background: e.target.value })}
+            className="h-7 w-full cursor-pointer rounded border border-bordered bg-raised p-0.5"
+            aria-label="Canvas background color"
+          />
+        </Field>
+      </Section>
+      <Section title="Reconstruction">
+        <p className="font-mono text-[12px]">
+          <span
+            className={
+              scene.overallConfidence >= 0.8
+                ? 'text-success'
+                : scene.overallConfidence >= 0.5
+                  ? 'text-warning'
+                  : 'text-danger'
+            }
+          >
+            {Math.round(scene.overallConfidence * 100)}%
+          </span>{' '}
+          <span className="text-muted">overall</span>
+        </p>
+        {Object.entries(scene.confidence).map(([key, value]) => (
+          <p key={key} className="mt-1 flex justify-between font-mono text-[12px]">
+            <span className="capitalize text-secondary">{key}</span>
+            <span className="text-muted">{Math.round(value * 100)}%</span>
+          </p>
+        ))}
+      </Section>
+    </>
+  );
+}
+
+function normalizeHex(value: string): string {
+  if (/^#[0-9a-fA-F]{6}$/.test(value)) return value;
+  const v = value.replace('#', '');
+  if (v.length === 3) {
+    return `#${v.split('').map((c) => c + c).join('')}`;
+  }
+  return '#000000';
+}

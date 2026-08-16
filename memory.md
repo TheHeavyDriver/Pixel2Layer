@@ -26,6 +26,13 @@ Brief change log. Read first each session; append a short entry after every comm
 | 18 | 2026-08-16 | `implement v0.2` | apps/api/export_service.py | PNG/JPG/SVG export + .p2l save/load round-trip |
 | 19 | 2026-08-16 | `implement v0.2` | apps/api/tests | 7 new test files → 37 pytest tests pass; ruff clean |
 | 20 | 2026-08-16 | `verify` | apps/api | Live E2E: upload poster → pipeline → scene graph with shapes/colors/confidence |
+| 21 | 2026-08-16 | `commit` | — | Task #2 committed: `52635fd feat(v0.2): reconstruction pipeline...` |
+| 22 | 2026-08-16 | `implement v0.2` | apps/api/app/api/routes/export.py, apps/api/app/main.py, apps/api/tests/test_export_api.py | Export routes: POST /api/export (png/jpg/svg), /api/export/p2l (save), /api/export/import (load); 6 new tests → 43 pass; ruff clean |
+| 23 | 2026-08-16 | `implement v0.2` | apps/web/package.json | Added fabric ^7.4.0; verified v7 group/ungroup + canvas APIs under jsdom |
+| 24 | 2026-08-16 | `implement v0.2` | apps/web/src/lib/editor/{scene-fabric.ts,use-scene-history.ts} | Scene↔Fabric bridge (group flattening in canvasToScene, canvas-plane math) + snapshot undo/redo hook |
+| 25 | 2026-08-16 | `implement v0.2` | apps/web/src/components/editor/{canvas-editor.tsx,layers-panel.tsx,properties-panel.tsx,editor-screen.tsx} | Fabric canvas editor w/ imperative handle, layers panel (rename/eye/lock/reorder), properties panel, editor screen + toolbar (undo/redo/group/align/zoom/export) |
+| 26 | 2026-08-16 | `implement v0.2` | apps/web/src/app/editor/page.tsx, apps/web/src/lib/api.ts | Editor page now renders EditorScreen (jobId from searchParams); api.ts: getJob, exportScene, saveProjectP2l, importProjectP2l |
+| 27 | 2026-08-16 | `verify` | apps/web apps/api | Web typecheck + build pass; fabric v7 APIs verified in jsdom; API 43 tests pass; ruff clean |
 
 ## Files
 
@@ -36,7 +43,7 @@ Brief change log. Read first each session; append a short entry after every comm
 - `package.json`, `docker-compose.yml`, `.gitignore` — monorepo root
 - `packages/schema/` — SceneGraphSchema shared contract (TS)
 - `apps/api/` — FastAPI backend (upload, job queue, SSE, v0.2 reconstruction pipeline); `.venv` + `uv`
-- `apps/web/` — Next.js 16 frontend (upload modal, SSE progress screen)
+- `apps/web/` — Next.js 16 frontend (upload modal, SSE progress screen, Fabric.js editor: canvas-editor/layers-panel/properties-panel/editor-screen)
 
 ## Convention
 
