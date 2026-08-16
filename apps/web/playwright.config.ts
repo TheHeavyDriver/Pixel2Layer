@@ -19,7 +19,7 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [
     {
-      command: `../api/.venv/bin/uvicorn app.main:app --port ${API_PORT}`,
+      command: `DB_BACKEND=memory JOB_BACKEND=memory ../api/.venv/bin/uvicorn app.main:app --port ${API_PORT}`,
       cwd: '../api',
       url: `http://localhost:${API_PORT}/api/health`,
       reuseExistingServer: false,

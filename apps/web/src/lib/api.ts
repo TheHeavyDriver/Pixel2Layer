@@ -42,6 +42,7 @@ async function handle<T>(res: Response): Promise<T> {
     const detail = await res.json().catch(() => null);
     throw new Error(detail?.detail ?? `Request failed (${res.status})`);
   }
+  if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
 
@@ -165,6 +166,163 @@ export async function importProjectP2l(file: Blob): Promise<Record<string, unkno
     throw new Error(detail?.detail ?? `Import failed (${res.status})`);
   }
   return res.json();
+}
+
+// -- auth -------------------------------------------------------------------
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string | null;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: AuthUser;
+}
+
+const TOKEN_KEY = 'pixel2layer.token';
+
+export function getToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return window.localStorage.getItem(TOKEN_KEY);
+}
+
+export function setToken(token: string | null): void {
+  if (typeof window === 'undefined') return;
+  if (token) window.localStorage.setItem(TOKEN_KEY, token);
+  else window.localStorage.removeItem(TOKEN_KEY);
+}
+
+/** fetch that attaches the stored bearer token to authenticated endpoints. */
+async function authFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getToken();
+  const headers = new Headers(init?.headers);
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+  if (init?.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  return handle<T>(await fetch(`${API_BASE}${path}`, { ...init, headers }));
+}
+
+async function authRequest(path: string, method: string, body: unknown): Promise<AuthResponse> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method,
+    headers: JSON_HEADERS,
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => null);
+    throw new Error(detail?.detail ?? `${path} failed (${res.status})`);
+  }
+  const parsed = (await res.json()) as AuthResponse;
+  setToken(parsed.token);
+  return parsed;
+}
+
+export async function register(input: {
+  email: string;
+  password: string;
+  name?: string;
+}): Promise<AuthResponse> {
+  return authRequest('/api/auth/register', 'POST', input);
+}
+
+export async function login(input: { email: string; password: string }): Promise<AuthResponse> {
+  return authRequest('/api/auth/login', 'POST', input);
+}
+
+export function logout(): void {
+  setToken(null);
+}
+
+/** Resolve the signed-in user, or null when no token exists / the token is invalid. */
+export async function getCurrentUser(): Promise<AuthUser | null> {
+  if (!getToken()) return null;
+  try {
+    return await authFetch<AuthUser>('/api/auth/me');
+  } catch {
+    setToken(null);
+    return null;
+  }
+}
+
+// -- projects ----------------------------------------------------------------
+
+export interface ProjectSummary {
+  id: string;
+  name: string;
+  sourceImage: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Project extends ProjectSummary {
+  sceneGraph: Record<string, unknown>;
+}
+
+export interface Version {
+  id: string;
+  projectId: string;
+  versionNo: number;
+  label: string | null;
+  sceneGraph: Record<string, unknown>;
+  createdAt: string;
+}
+
+export async function createProject(
+  name: string,
+  sceneGraph: Record<string, unknown>,
+  sourceImage?: string,
+): Promise<Project> {
+  return authFetch<Project>('/api/projects', {
+    method: 'POST',
+    body: JSON.stringify({ name, sceneGraph, sourceImage }),
+  });
+}
+
+export async function listProjects(): Promise<ProjectSummary[]> {
+  return authFetch<ProjectSummary[]>('/api/projects');
+}
+
+export async function getProject(projectId: string): Promise<Project> {
+  return authFetch<Project>(`/api/projects/${projectId}`);
+}
+
+export async function updateProject(
+  projectId: string,
+  patch: { name?: string; sceneGraph?: Record<string, unknown> },
+): Promise<Project> {
+  return authFetch<Project>(`/api/projects/${projectId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function deleteProject(projectId: string): Promise<void> {
+  return authFetch<void>(`/api/projects/${projectId}`, { method: 'DELETE' });
+}
+
+export async function saveVersion(
+  projectId: string,
+  sceneGraph: Record<string, unknown>,
+  label?: string,
+): Promise<Version> {
+  return authFetch<Version>(`/api/projects/${projectId}/versions`, {
+    method: 'POST',
+    body: JSON.stringify({ sceneGraph, label }),
+  });
+}
+
+export async function listVersions(projectId: string): Promise<Version[]> {
+  return authFetch<Version[]>(`/api/projects/${projectId}/versions`);
+}
+
+export async function restoreVersion(
+  projectId: string,
+  versionNo: number,
+): Promise<Project> {
+  return authFetch<Project>(`/api/projects/${projectId}/versions/${versionNo}/restore`, {
+    method: 'POST',
+  });
 }
 
 /**

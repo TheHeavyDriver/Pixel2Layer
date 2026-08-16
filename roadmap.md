@@ -38,12 +38,12 @@ Goal: upload an image and end up with a fully editable design in the browser —
 
 Goal: accounts and durable project library.
 
-- [ ] Supabase Auth — email/password + OAuth (GitHub, Google)
-- [ ] **ProjectService** 🔬 — project CRUD (create, rename, delete, list), scoped to the authenticated user 🔒
-- [ ] Cloud persistence of scene graphs and `.p2l` projects to Supabase Storage/Postgres
-- [ ] **Version history** 🔬 — snapshot-based versioning per project; restore to earlier version
-- [ ] Project dashboard (list / open / delete / rename your projects)
-- [ ] First class `.p2l` save/load across sessions for logged-in users
+- [x] Auth — self-hosted email/password + JWT bearer (pluggable seam for Supabase Auth / OAuth later)
+- [x] **ProjectService** 🔬 — project CRUD (create, rename, delete, list), scoped to the authenticated user 🔒
+- [x] Cloud persistence of scene graphs and projects to Postgres (Postgres backend; Supabase Storage deferred)
+- [x] **Version history** 🔬 — snapshot-based versioning per project; restore to earlier version
+- [x] Project dashboard (list / open / delete / rename your projects)
+- [x] First class `.p2l` save/load across sessions for logged-in users
 
 **Exit criteria:** a signed-in user creates, edits, saves, reopens, and rolls back projects from any browser.
 

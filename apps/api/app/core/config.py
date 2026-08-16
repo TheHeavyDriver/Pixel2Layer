@@ -24,6 +24,15 @@ class Settings(BaseSettings):
     job_backend: Literal["memory", "redis"] = "memory"
     redis_url: str = "redis://localhost:6379/0"
 
+    # Persistence (users / projects / versions)
+    db_backend: Literal["memory", "postgres"] = "memory"
+    postgres_url: str = "postgresql://pixel2layer:pixel2layer@localhost:5434/pixel2layer"
+
+    # Auth
+    jwt_secret: str = "dev-secret-change-me"
+    jwt_algorithm: str = "HS256"
+    jwt_expires_minutes: int = 60 * 24 * 7  # 7 days
+
     # CORS — allowed frontend origins (comma separated)
     cors_origins: str = "http://localhost:3000"
 

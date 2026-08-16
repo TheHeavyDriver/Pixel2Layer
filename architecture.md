@@ -83,7 +83,7 @@ This document is the technical blueprint for the Pixel2Layer platform, derived f
 - **Pipelines** → creates `/jobs/{id}`; client polls or subscribes to SSE for progress; on completion returns the scene graph (possibly fetched directly from storage).
 - **ProjectService** → CRUD over Postgres; version snapshots; share links with view/edit scope; template gallery; batch group tracking.
 - **ExportService** → server-side rasterization of the scene graph to PNG/JPG/SVG/PDF; stores result in Storage; `.p2l` serialization/deserialization.
-- **Auth** → Supabase Auth integration for email/OAuth; JWT-based bearer for data access.
+- **Auth** → email/password + JWT bearer (self-hosted, v0.3); Supabase Auth for OAuth remains the production seam.
 
 ### 3.3 Worker & Reconstruction Pipeline
 

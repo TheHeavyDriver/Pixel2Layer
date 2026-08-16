@@ -1,17 +1,35 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { ProgressScreen } from '@/components/progress-screen';
 import { UploadModal } from '@/components/upload-modal';
-import { createJob, uploadImage, type JobResponse } from '@/lib/api';
+import {
+  createJob,
+  getCurrentUser,
+  logout,
+  uploadImage,
+  type AuthUser,
+  type JobResponse,
+} from '@/lib/api';
 
 export default function Home() {
   const router = useRouter();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [activeJob, setActiveJob] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getCurrentUser().then((me) => {
+      if (!cancelled) setUser(me);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function handleUpload(file: File) {
     setUploadOpen(false);
@@ -40,13 +58,44 @@ export default function Home() {
           <span className="h-5 w-5 rounded-[4px] bg-accent" aria-hidden />
           <span className="text-[15px] font-semibold tracking-[-0.02em]">Pixel2Layer</span>
         </div>
-        <button
-          type="button"
-          className="h-10 rounded-[10px] bg-accent px-5 text-[13px] font-medium text-white transition-colors hover:bg-accent-hover"
-          onClick={() => setUploadOpen(true)}
-        >
-          Get started →
-        </button>
+        <div className="flex items-center gap-2">
+          {user ? (
+            <>
+              <button
+                type="button"
+                onClick={() => router.push('/dashboard')}
+                className="h-9 rounded-[10px] border border-bordered px-4 text-[13px] font-medium text-secondary transition-colors hover:bg-raised"
+              >
+                My projects
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  logout();
+                  setUser(null);
+                }}
+                className="h-9 rounded-[10px] px-3 text-[13px] font-medium text-secondary transition-colors hover:bg-raised"
+              >
+                Log out
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => router.push('/login')}
+              className="h-9 rounded-[10px] border border-bordered px-4 text-[13px] font-medium text-secondary transition-colors hover:bg-raised"
+            >
+              Sign in
+            </button>
+          )}
+          <button
+            type="button"
+            className="h-10 rounded-[10px] bg-accent px-5 text-[13px] font-medium text-white transition-colors hover:bg-accent-hover"
+            onClick={() => setUploadOpen(true)}
+          >
+            Get started →
+          </button>
+        </div>
       </nav>
 
       <div className="pt-16">

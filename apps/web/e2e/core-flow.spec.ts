@@ -50,7 +50,7 @@ test('full flow: upload → editor loads layers → edit → export → reopen .
 
   // save a .p2l project file
   const p2l = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Save' }).click();
+  await page.getByRole('button', { name: 'Save .p2l' }).click();
   const p2lDownload = await p2l;
   expect(p2lDownload.suggestedFilename()).toBe('design.p2l');
 
@@ -58,7 +58,7 @@ test('full flow: upload → editor loads layers → edit → export → reopen .
   const savedPath = `/tmp/opencode/${p2lDownload.suggestedFilename()}`;
   await p2lDownload.saveAs(savedPath);
   const chooserPromise = page.waitForEvent('filechooser');
-  await page.getByRole('button', { name: 'Open' }).click();
+  await page.getByRole('button', { name: 'Open', exact: true }).click();
   await (await chooserPromise).setFiles(savedPath);
 
   // scene reloaded with the same layers

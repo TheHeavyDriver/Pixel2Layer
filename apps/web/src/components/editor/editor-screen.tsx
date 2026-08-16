@@ -11,11 +11,22 @@ import {
   CanvasEditor,
   type CanvasEditorHandle,
 } from '@/components/editor/canvas-editor';
-import { getJob } from '@/lib/api';
+import {
+  createProject,
+  getJob,
+  getProject,
+  getToken,
+  listVersions,
+  restoreVersion,
+  saveVersion,
+  updateProject,
+  type Version,
+} from '@/lib/api';
 import { useSceneHistory } from '@/lib/editor/use-scene-history';
 
 interface EditorScreenProps {
   jobId: string | null;
+  projectId?: string | null;
 }
 
 function emptyScene(): SceneGraph {
@@ -28,30 +39,40 @@ function emptyScene(): SceneGraph {
   };
 }
 
-export function EditorScreen({ jobId }: EditorScreenProps) {
+export function EditorScreen({ jobId, projectId }: EditorScreenProps) {
   const router = useRouter();
   const [initialScene] = useState<SceneGraph>(() => emptyScene());
   const history = useSceneHistory(initialScene);
   const { scene, commit, undo, redo, reset } = history;
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [loading, setLoading] = useState(Boolean(jobId));
+  const [loading, setLoading] = useState(Boolean(jobId) || Boolean(projectId));
   const [loadError, setLoadError] = useState<string | null>(null);
   const editorRef = useRef<CanvasEditorHandle | null>(null);
 
-  // load the reconstructed scene (if navigated from a completed job)
+  // cloud project state (v0.3 persistence)
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(projectId ?? null);
+  const [projectName, setProjectName] = useState('Untitled design');
+
+  // load an existing project (preferred) or a finished job's scene graph
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      if (!jobId) return;
+      if (!projectId && !jobId) return;
       setLoading(true);
+      setLoadError(null);
       try {
-        const job = await getJob(jobId);
-        if (cancelled) return;
-        const result = job.result as { scene?: SceneGraph } | null;
-        const loaded: SceneGraph = result?.scene
-          ? (result.scene as SceneGraph)
-          : emptyScene();
-        reset(loaded);
+        if (projectId) {
+          const project = await getProject(projectId);
+          if (cancelled) return;
+          setActiveProjectId(project.id);
+          setProjectName(project.name);
+          reset(project.sceneGraph as unknown as SceneGraph);
+        } else {
+          const job = await getJob(jobId!);
+          if (cancelled) return;
+          const result = job.result as { scene?: SceneGraph } | null;
+          reset(result?.scene ? (result.scene as SceneGraph) : emptyScene());
+        }
       } catch (e) {
         if (!cancelled) {
           setLoadError(e instanceof Error ? e.message : 'Failed to load design.');
@@ -64,7 +85,7 @@ export function EditorScreen({ jobId }: EditorScreenProps) {
     return () => {
       cancelled = true;
     };
-  }, [jobId, reset]);
+  }, [projectId, jobId, reset]);
 
   // guard scene schema shape from older payloads
   const safeScene: SceneGraph = {
@@ -206,6 +227,14 @@ export function EditorScreen({ jobId }: EditorScreenProps) {
         onRedo={redo}
         history={history}
         editorRef={editorRef}
+        activeProjectId={activeProjectId}
+        projectName={projectName}
+        onProjectChange={(id, name) => {
+          setActiveProjectId(id);
+          setProjectName(name);
+        }}
+        onRestoreScene={reset}
+        readScene={() => (editorRef.current?.readScene() ?? safeScene) as unknown as Record<string, unknown>}
       />
       <div className="flex min-h-0 flex-1">
         <LayersPanel
@@ -268,6 +297,11 @@ function Toolbar({
   onRedo,
   history,
   editorRef,
+  activeProjectId,
+  projectName,
+  onProjectChange,
+  onRestoreScene,
+  readScene,
 }: {
   scene: SceneGraph;
   onChange: (s: SceneGraph) => void;
@@ -275,9 +309,15 @@ function Toolbar({
   onRedo: () => SceneGraph | null;
   history: ReturnType<typeof useSceneHistory>;
   editorRef: React.RefObject<CanvasEditorHandle | null>;
+  activeProjectId: string | null;
+  projectName: string;
+  onProjectChange: (id: string, name: string) => void;
+  onRestoreScene: (scene: SceneGraph) => void;
+  readScene: () => Record<string, unknown>;
 }) {
   const canUndo = history.canUndo;
   const canRedo = history.canRedo;
+  const router = useRouter();
   const [exporting, setExporting] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
 
@@ -325,6 +365,16 @@ function Toolbar({
       <span className="mr-2 hidden text-[13px] font-semibold tracking-[-0.01em] lg:inline">
         Pixel2Layer
       </span>
+      <div className="h-5 w-px bg-bordered" />
+      <button
+        type="button"
+        className={btn}
+        onClick={() => router.push('/dashboard')}
+        title="My projects"
+        data-testid="dashboard-btn"
+      >
+        Dashboard
+      </button>
       <div className="h-5 w-px bg-bordered" />
       <button type="button" className={btn} onClick={() => onUndo()} disabled={!canUndo} title="Undo (Ctrl+Z)" data-testid="undo-btn">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 14 4 9l5-5" /><path d="M4 9h10a5 5 0 0 1 0 10h-3" /></svg>
@@ -402,8 +452,16 @@ function Toolbar({
         Open
       </button>
       <button type="button" className={btn} onClick={() => void handleSave()} disabled={exporting === 'p2l'} title="Save as .p2l">
-        {exporting === 'p2l' ? 'Saving…' : 'Save'}
+        {exporting === 'p2l' ? 'Saving…' : 'Save .p2l'}
       </button>
+      <div className="h-5 w-px bg-bordered" />
+      <CloudSaveControl
+        activeProjectId={activeProjectId}
+        projectName={projectName}
+        onProjectChange={onProjectChange}
+        onRestoreScene={onRestoreScene}
+        readScene={readScene}
+      />
       <div className="h-5 w-px bg-bordered" />
       {(['png', 'jpg', 'svg'] as const).map((f) => (
         <button
@@ -446,4 +504,178 @@ function pickFile(): Promise<File | null> {
     input.oncancel = () => resolve(null);
     input.click();
   });
+}
+
+// -- cloud project persistence ----------------------------------------------
+
+function CloudSaveControl({
+  activeProjectId,
+  projectName,
+  onProjectChange,
+  onRestoreScene,
+  readScene,
+}: {
+  activeProjectId: string | null;
+  projectName: string;
+  onProjectChange: (id: string, name: string) => void;
+  onRestoreScene: (scene: SceneGraph) => void;
+  readScene: () => Record<string, unknown>;
+}) {
+  const router = useRouter();
+  const [versions, setVersions] = useState<Version[]>([]);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+
+  const refreshVersions = useCallback(async () => {
+    if (!activeProjectId) {
+      setVersions([]);
+      return;
+    }
+    try {
+      setVersions(await listVersions(activeProjectId));
+    } catch {
+      // non-fatal: the version list refreshes next open
+    }
+  }, [activeProjectId]);
+
+  useEffect(() => {
+    if (activeProjectId) void refreshVersions();
+  }, [activeProjectId, refreshVersions]);
+
+  async function ensureAuthed(): Promise<boolean> {
+    if (getToken()) return true;
+    router.push(`/login?redirect=${encodeURIComponent(window.location.href)}`);
+    return false;
+  }
+
+  async function handleSaveProject() {
+    if (!(await ensureAuthed())) return;
+    setStatus(null);
+    setBusy('save');
+    try {
+      const sceneGraph = readScene();
+      if (!activeProjectId) {
+        const name = window.prompt('Name this project', projectName);
+        if (!name?.trim()) return;
+        const created = await createProject(name.trim(), sceneGraph);
+        onProjectChange(created.id, created.name);
+        router.replace(`/editor?project=${created.id}`, { scroll: false });
+        await refreshVersions();
+        setStatus('Project saved');
+      } else {
+        await updateProject(activeProjectId, { sceneGraph });
+        setStatus('Saved');
+      }
+    } catch (e) {
+      setStatus(e instanceof Error ? e.message : 'Save failed');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleSaveVersion() {
+    setStatus(null);
+    if (!activeProjectId) {
+      setStatus('Save the project first');
+      return;
+    }
+    setBusy('version');
+    try {
+      const version = await saveVersion(activeProjectId, readScene(), `Version ${versions.length + 1}`);
+      setOpen(false);
+      await refreshVersions();
+      setStatus(`Version ${version.versionNo} saved`);
+    } catch (e) {
+      setStatus(e instanceof Error ? e.message : 'Save failed');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleRestore(versionNo: number) {
+    if (!activeProjectId) return;
+    if (!window.confirm(`Restore version ${versionNo}? The current canvas state will be replaced.`)) return;
+    setStatus(null);
+    setBusy(`v${versionNo}`);
+    try {
+      const restored = await restoreVersion(activeProjectId, versionNo);
+      onRestoreScene(restored.sceneGraph as unknown as SceneGraph);
+      setOpen(false);
+      setStatus(`Restored version ${versionNo}`);
+    } catch (e) {
+      setStatus(e instanceof Error ? e.message : 'Restore failed');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const btn =
+    'flex h-7 items-center justify-center gap-1 rounded-[8px] px-2 text-[12px] font-medium text-secondary transition-colors hover:bg-raised disabled:opacity-40';
+
+  return (
+    <div className="relative flex items-center gap-1">
+      {activeProjectId && (
+        <span className="hidden max-w-[140px] truncate text-[11px] text-muted xl:inline" title={projectName}>
+          {projectName}
+        </span>
+      )}
+      <button
+        type="button"
+        className={btn}
+        onClick={() => void handleSaveProject()}
+        disabled={busy !== null}
+        title="Save to your projects (sign in required)"
+        data-testid="save-project-btn"
+      >
+        {busy === 'save' ? 'Saving…' : activeProjectId ? 'Update project' : 'Save to projects'}
+      </button>
+      <button
+        type="button"
+        className={btn}
+        onClick={() => setOpen((v) => !v)}
+        disabled={!activeProjectId || busy !== null}
+        title={activeProjectId ? 'Versions & restore' : 'Save the project first'}
+        data-testid="versions-btn"
+      >
+        Versions {versions.length > 0 ? `(${versions.length})` : ''}
+      </button>
+      {status && (
+        <span className="ml-1 text-[12px] text-secondary" role="status">
+          {status}
+        </span>
+      )}
+      {open && activeProjectId && (
+        <div
+          className="absolute right-0 top-8 z-20 min-w-[240px] rounded-[12px] border border-bordered bg-surface p-2 shadow-xl"
+          data-testid="versions-menu"
+        >
+          <button
+            type="button"
+            className="flex h-8 w-full items-center rounded-[8px] px-2 text-left text-[12px] font-medium text-accent transition-colors hover:bg-raised"
+            onClick={() => void handleSaveVersion()}
+            disabled={busy === 'version'}
+          >
+            {busy === 'version' ? 'Saving…' : 'Save current as version'}
+          </button>
+          <div className="my-1 h-px bg-bordered" />
+          {versions.length === 0 ? (
+            <p className="px-2 py-1 text-[12px] text-muted">No versions yet</p>
+          ) : (
+            [...versions].reverse().map((v) => (
+              <button
+                key={v.id}
+                type="button"
+                className="flex h-8 w-full items-center justify-between rounded-[8px] px-2 text-left text-[12px] transition-colors hover:bg-raised"
+                onClick={() => void handleRestore(v.versionNo)}
+              >
+                <span>{v.label ?? `Version ${v.versionNo}`}</span>
+                <span className="text-muted">v{v.versionNo}</span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
 }

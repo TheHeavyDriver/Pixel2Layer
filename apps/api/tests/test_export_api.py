@@ -17,6 +17,7 @@ async def client(tmp_path: Path) -> AsyncIterator[httpx.AsyncClient]:
     settings = Settings(
         storage_dir=tmp_path / "storage",
         job_backend="memory",
+        db_backend="memory",
         environment="test",
     )
     app = create_app(settings)

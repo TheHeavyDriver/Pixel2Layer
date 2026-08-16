@@ -6,10 +6,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from app.api.routes import export, jobs, upload
+from app.api.routes import auth_routes, export, jobs, projects, upload
 from app.core.config import Settings, get_settings
 from app.services.job_queue import JobQueue, build_repository
 from app.services.pipeline_worker import build_worker
+from app.services.store import build_store
 from app.services.upload_service import UploadService, build_storage
 
 
@@ -18,6 +19,7 @@ class HealthResponse(BaseModel):
     app: str
     environment: str
     jobBackend: str
+    dbBackend: str
 
 
 @asynccontextmanager
@@ -25,6 +27,9 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     storage = build_storage(settings)
     app.state.upload_service = UploadService(storage, settings)
+    store = build_store(settings)
+    await store.init()
+    app.state.store = store
     app.state.job_queue = JobQueue(
         build_repository(settings), settings, worker_impl=build_worker(storage)
     )
@@ -33,6 +38,7 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         await app.state.job_queue.stop()
+        await store.close()
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -59,6 +65,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(upload.router)
     app.include_router(jobs.router)
     app.include_router(export.router)
+    app.include_router(auth_routes.router)
+    app.include_router(projects.router)
 
     @app.get("/api/health", response_model=HealthResponse, tags=["health"])
     async def health() -> HealthResponse:
@@ -67,6 +75,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             app=s.app_name,
             environment=s.environment,
             jobBackend=s.job_backend,
+            dbBackend=s.db_backend,
         )
 
     return app

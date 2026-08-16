@@ -3,8 +3,11 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'jsdom',
+    environmentOptions: {
+      jsdom: { url: 'http://localhost:3000' },
+    },
     globals: true,
-    setupFiles: ['vitest-canvas-mock'],
+    setupFiles: ['vitest-canvas-mock', './src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
   },
   resolve: {
