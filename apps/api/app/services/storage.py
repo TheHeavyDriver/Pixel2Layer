@@ -24,6 +24,10 @@ class StorageBackend(ABC):
     @abstractmethod
     async def delete(self, key: str) -> None: ...
 
+    async def list_files(self, prefix: str) -> list[str]:
+        """Return object keys under a prefix (used to resolve extensioned keys)."""
+        return []
+
 
 class LocalStorage(StorageBackend):
     """Filesystem-backed storage for local dev / tests."""
@@ -53,3 +57,18 @@ class LocalStorage(StorageBackend):
         path = self._path_for(key)
         if path.exists():
             path.unlink()
+
+    async def list_files(self, prefix: str) -> list[str]:
+        root_resolved = self.root.resolve()
+        base = (self.root / prefix).resolve()
+        if not base.is_relative_to(root_resolved):
+            raise ValueError(f"invalid prefix: {prefix}")
+        matches: list[str] = []
+        prefix_str = prefix
+        for path in self.root.rglob("*"):
+            if not path.is_file():
+                continue
+            rel = str(path.relative_to(self.root))
+            if rel.startswith(prefix_str):
+                matches.append(rel)
+        return sorted(matches)

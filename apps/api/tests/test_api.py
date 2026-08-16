@@ -4,11 +4,22 @@ import asyncio
 from collections.abc import AsyncIterator
 from pathlib import Path
 
+import cv2
 import httpx
+import numpy as np
 import pytest
 
 from app.core.config import Settings
 from app.main import create_app
+
+
+def sample_png_bytes(*, width: int = 160, height: int = 120) -> bytes:
+    """Synthetic flat-color poster image with a red circle for the pipeline."""
+    img = np.full((height, width, 3), 240, dtype=np.uint8)  # light background
+    cv2.circle(img, (width // 2, height // 2), 30, (30, 30, 200), thickness=-1)
+    ok, buf = cv2.imencode(".png", img)
+    assert ok
+    return buf.tobytes()
 
 
 @pytest.fixture()
@@ -40,7 +51,7 @@ async def test_upload_then_job_then_result(
     # upload
     up = await client.post(
         "/api/upload",
-        files={"file": ("poster.png", b"\x89PNG\r\n\x1a\nhello", "image/png")},
+        files={"file": ("poster.png", sample_png_bytes(), "image/png")},
     )
     assert up.status_code == 201
     upload_json = up.json()
@@ -79,7 +90,7 @@ async def test_upload_rejects_bad_type(client: httpx.AsyncClient) -> None:
 async def test_job_events_sse(client: httpx.AsyncClient) -> None:
     up = await client.post(
         "/api/upload",
-        files={"file": ("poster.png", b"pngbytes", "image/png")},
+        files={"file": ("poster.png", sample_png_bytes(), "image/png")},
     )
     upload_id = up.json()["uploadId"]
 

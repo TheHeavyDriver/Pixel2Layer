@@ -21,6 +21,11 @@ Brief change log. Read first each session; append a short entry after every comm
 | 13 | 2026-08-16 | `implement v0.1` | apps/api/tests | 16 pytest tests pass: upload validation, job lifecycle, SSE, API flow |
 | 14 | 2026-08-16 | `implement v0.1` | apps/web/* | Next.js 16 + TS + Tailwind (v4 design tokens), upload modal + SSE progress screen, editor placeholder |
 | 15 | 2026-08-16 | `verify` | apps/web | typecheck + build pass; end-to-end smoke test: upload→job→SSE→done verified live |
+| 16 | 2026-08-16 | `commit` | — | Task #1 committed: `909fb1b feat(v0.1): scaffold monorepo...` |
+| 17 | 2026-08-16 | `implement v0.2` | apps/api/{schemas,services} | SceneGraph pydantic models, ConfidenceScorer, ShapeDetector, ColorExtractor, TextDetector (vision-based, pluggable OCR), SceneGraphBuilder, pipeline orchestrator wired into JobQueue worker |
+| 18 | 2026-08-16 | `implement v0.2` | apps/api/export_service.py | PNG/JPG/SVG export + .p2l save/load round-trip |
+| 19 | 2026-08-16 | `implement v0.2` | apps/api/tests | 7 new test files → 37 pytest tests pass; ruff clean |
+| 20 | 2026-08-16 | `verify` | apps/api | Live E2E: upload poster → pipeline → scene graph with shapes/colors/confidence |
 
 ## Files
 
@@ -30,7 +35,7 @@ Brief change log. Read first each session; append a short entry after every comm
 - `memory.md` — this log
 - `package.json`, `docker-compose.yml`, `.gitignore` — monorepo root
 - `packages/schema/` — SceneGraphSchema shared contract (TS)
-- `apps/api/` — FastAPI backend (upload, job queue, SSE); `.venv` + `uv`
+- `apps/api/` — FastAPI backend (upload, job queue, SSE, v0.2 reconstruction pipeline); `.venv` + `uv`
 - `apps/web/` — Next.js 16 frontend (upload modal, SSE progress screen)
 
 ## Convention

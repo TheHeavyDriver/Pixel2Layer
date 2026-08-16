@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from app.api.routes import jobs, upload
 from app.core.config import Settings, get_settings
 from app.services.job_queue import JobQueue, build_repository
+from app.services.pipeline_worker import build_worker
 from app.services.upload_service import UploadService, build_storage
 
 
@@ -24,7 +25,9 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     storage = build_storage(settings)
     app.state.upload_service = UploadService(storage, settings)
-    app.state.job_queue = JobQueue(build_repository(settings), settings)
+    app.state.job_queue = JobQueue(
+        build_repository(settings), settings, worker_impl=build_worker(storage)
+    )
     app.state.job_queue.start()
     try:
         yield
