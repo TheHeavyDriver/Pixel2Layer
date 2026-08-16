@@ -52,6 +52,13 @@ Brief change log. Read first each session; append a short entry after every comm
 | 44 | 2026-08-16 | `fix` | apps/web/src/components/progress-screen.tsx | Move data-testid="overall-progress" to track container (0-width inner bar was hidden; flaky e2e) |
 | 45 | 2026-08-16 | `verify` | apps/web | 2 Playwright e2e pass consistently (auth + core flow); next build green |
 | 46 | 2026-08-16 | `commit` | — | v0.4 milestone: vectorizer, segmentation, confidence UI, progressive routing |
+| 47 | 2026-08-16 | `implement v0.5` | apps/api/{services/store.py, api/routes/{sharing,templates,batches}.py}, app/main.py, services/{job_queue,export_service}.py, routes/export.py | Backend: share/template/batch persistence (Store + Postgres DDL + memory), share routes (create/list/revoke + public view/edit), template routes (save/gallery/get/delete), batch routes (create + status), PDF export via Pillow |
+| 48 | 2026-08-16 | `implement v0.5` | apps/api/tests/{test_sharing,test_templates,test_batches}.py, test_export_api.py, test_export_service.py | 15 new tests (sharing scoping/revoke, template gallery/ownership, batch job tracking, PDF) → 86 pytest pass; ruff clean |
+| 49 | 2026-08-16 | `implement v0.5` | apps/web/src/lib/api.ts, api client tests (v05-api.test.ts) | Web api client: createShare/listShares/revokeShare/shareUrl/getSharedProject/updateSharedProject, createTemplate/listTemplates/getTemplate/deleteTemplate, createBatch/getBatch, pdf export format; 9 new vitest → 45 pass |
+| 50 | 2026-08-16 | `implement v0.5` | apps/web/src/app/editor/page.tsx, share/[token]/page.tsx, templates/page.tsx, page.tsx, components/editor/editor-screen.tsx | Editor: shareToken+templateId load paths, ShareControl dialog (view/edit, copy, revoke), Save-as-template, PDF export, view-only mode; /share/[token] page; /templates gallery; home multi-file/batch upload + Templates link; UploadModal multi-file; BatchProgressScreen |
+| 51 | 2026-08-16 | `implement v0.5` | apps/web/e2e/v05-flow.spec.ts | Playwright e2e: sharing create→open→revoke, template save→gallery→reuse + PDF export; home "Get started"→"Upload an image" button update in existing specs |
+| 52 | 2026-08-16 | `verify` | apps/api apps/web | 86 pytest + 45 vitest + 4 Playwright e2e pass; tsc + next build green; ruff clean — v0.5 exit criteria met (share/edit/revoke, template gallery start, batch, PDF) |
+| 53 | 2026-08-16 | `commit` | — | v0.5 milestone: sharing, templates, batch processing, PDF export |
 
 ## Files
 

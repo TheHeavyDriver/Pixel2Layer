@@ -73,6 +73,14 @@ async def test_export_svg(client: httpx.AsyncClient) -> None:
     assert r.content.decode().startswith("<svg")
 
 
+async def test_export_pdf(client: httpx.AsyncClient) -> None:
+    r = await client.post("/api/export", json={"format": "pdf", "scan": 1.0, "scene": _scene()})
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "application/pdf"
+    assert r.content[:5] == b"%PDF-"
+    assert 'filename="design.pdf"' in r.headers["content-disposition"]
+
+
 async def test_export_rejects_bad_format(client: httpx.AsyncClient) -> None:
     r = await client.post("/api/export", json={"format": "gif", "scan": 1.0, "scene": _scene()})
     assert r.status_code == 422

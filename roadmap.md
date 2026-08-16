@@ -53,12 +53,12 @@ Goal: accounts and durable project library.
 
 Goal: handle logos/illustrations/photographs and make reconstruction quality transparent.
 
-- [ ] **Vectorizer** 🔬 — Potrace + OpenCV contours → SVG paths; path editing in the editor
-- [ ] **Segmenter** 🔬 — SAM 2 foreground/object segmentation → masked image layers, explicitly labeled approximate
-- [ ] **ConfidenceScorer** full UI — per-element confidence badges + overall reconstruction summary
-- [ ] Progressive reconstruction strategy — route simple vs complex images appropriately
-- [ ] Vector path editing controls in PropertiesPanel
-- [ ] Harder-image handling: crops of silhouettes, logos on photos, text on complex backgrounds
+- [x] **Vectorizer** 🔬 — Potrace + OpenCV contours → SVG paths; path editing in the editor
+- [x] **Segmenter** 🔬 — SAM 2 foreground/object segmentation → masked image layers, explicitly labeled approximate
+- [x] **ConfidenceScorer** full UI — per-element confidence badges + overall reconstruction summary
+- [x] Progressive reconstruction strategy — route simple vs complex images appropriately
+- [x] Vector path editing controls in PropertiesPanel
+- [~] Harder-image handling: crops of silhouettes, logos on photos, text on complex backgrounds (progressive router + confidence notes; deep-tuning deferred to backlog)
 
 **Exit criteria:** logos and simple illustrations reconstruct as editable vectors, photos segment into editable regions with clear confidence labeling, and complex images degrade gracefully.
 
@@ -68,11 +68,11 @@ Goal: handle logos/illustrations/photographs and make reconstruction quality tra
 
 Goal: distribution and productivity.
 
-- [ ] **Sharing** 🔬 — shareable links with view/edit access control 🔒; access revocation
-- [ ] **Templates** 🔬 — save any reconstructed design as a template; template gallery; start project from template
-- [ ] **Batch processing** 🔬 — upload multiple images, queue and track each reconstruction, open results
-- [ ] PDF export via **ExportService**
-- [ ] Refinement of editor UX, performance, and empty/error states
+- [x] **Sharing** 🔬 — shareable links with view/edit access control 🔒; access revocation
+- [x] **Templates** 🔬 — save any reconstructed design as a template; template gallery; start project from template
+- [x] **Batch processing** 🔬 — upload multiple images, queue and track each reconstruction, open results
+- [x] PDF export via **ExportService**
+- [x] Refinement of editor UX, performance, and empty/error states
 
 **Exit criteria:** a user shares an editable design via link, starts a project from the template gallery, batch-reconstructs several images at once, and exports to PDF.
 

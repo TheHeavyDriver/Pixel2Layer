@@ -138,6 +138,9 @@ class JobQueue:
     async def get(self, job_id: str) -> Job | None:
         return await self.repository.get(job_id)
 
+    async def get_many(self, job_ids: list[str]) -> list[Job | None]:
+        return [await self.repository.get(job_id) for job_id in job_ids]
+
     # -- internal processing ------------------------------------------------
     async def _run_worker(self) -> None:
         while True:

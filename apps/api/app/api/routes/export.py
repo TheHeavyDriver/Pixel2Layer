@@ -15,7 +15,7 @@ _service = ExportService()
 
 
 class ExportRequest(BaseModel):
-    format: Literal["png", "jpg", "svg"]
+    format: Literal["png", "jpg", "svg", "pdf"]
     scan: float = Field(1.0, ge=0.1, le=4.0)
     scene: SceneGraph
 
@@ -30,6 +30,7 @@ _CONTENT_TYPES = {
     "png": "image/png",
     "jpg": "image/jpeg",
     "svg": "image/svg+xml",
+    "pdf": "application/pdf",
 }
 
 
@@ -39,6 +40,8 @@ async def export_scene(req: ExportRequest) -> Response:
     try:
         if req.format == "svg":
             result = _service.to_svg(req.scene)
+        elif req.format == "pdf":
+            result = _service.to_pdf(req.scene, scale=req.scan)
         else:
             result = _service.rasterize(req.scene, req.format, scale=req.scan)
     except ExportError as exc:

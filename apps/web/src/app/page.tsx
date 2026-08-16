@@ -3,21 +3,27 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { BatchProgressScreen } from '@/components/batch-progress-screen';
 import { ProgressScreen } from '@/components/progress-screen';
 import { UploadModal } from '@/components/upload-modal';
 import {
+  createBatch,
   createJob,
   getCurrentUser,
   logout,
   uploadImage,
   type AuthUser,
+  type Batch,
   type JobResponse,
 } from '@/lib/api';
 
 export default function Home() {
   const router = useRouter();
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploadMultiple, setUploadMultiple] = useState(false);
   const [activeJob, setActiveJob] = useState<string | null>(null);
+  const [activeBatch, setActiveBatch] = useState<Batch | null>(null);
+  const [batchBusy, setBatchBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
 
@@ -31,21 +37,42 @@ export default function Home() {
     };
   }, []);
 
-  async function handleUpload(file: File) {
+  async function handleUpload(files: File[]) {
     setUploadOpen(false);
     setError(null);
     try {
-      const upload = await uploadImage(file);
-      const job = await createJob(upload.uploadId);
-      setActiveJob(job.id);
+      if (files.length === 1) {
+        const upload = await uploadImage(files[0]);
+        const job = await createJob(upload.uploadId);
+        setActiveJob(job.id);
+      } else {
+        setBatchBusy(true);
+        const uploads = [];
+        for (const file of files) {
+          uploads.push(await uploadImage(file));
+        }
+        const batch = await createBatch(uploads.map((u) => u.uploadId));
+        setActiveBatch(batch);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Upload failed.');
+    } finally {
+      setBatchBusy(false);
     }
   }
 
   function handleDone(job: JobResponse | undefined) {
-    // v0.1: no editor yet — surface the completed job id; editor lands in v0.2.
     router.push(`/editor?job=${job?.id ?? ''}`);
+  }
+
+  if (activeBatch) {
+    return (
+      <BatchProgressScreen
+        batchId={activeBatch.id}
+        initialJobs={activeBatch.jobs}
+        onCancel={() => setActiveBatch(null)}
+      />
+    );
   }
 
   if (activeJob) {
@@ -88,13 +115,6 @@ export default function Home() {
               Sign in
             </button>
           )}
-          <button
-            type="button"
-            className="h-10 rounded-[10px] bg-accent px-5 text-[13px] font-medium text-white transition-colors hover:bg-accent-hover"
-            onClick={() => setUploadOpen(true)}
-          >
-            Get started →
-          </button>
         </div>
       </nav>
 
@@ -105,19 +125,35 @@ export default function Home() {
         <p className="mx-auto mt-4 max-w-xl text-center text-[16px] text-secondary">
           Drop a flat poster and get back text, shapes, vectors, and layers — fully editable.
         </p>
-        <div className="mt-8 flex items-center justify-center gap-3">
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <button
             type="button"
-            onClick={() => setUploadOpen(true)}
-            className="h-[40px] rounded-[10px] bg-accent px-6 text-[13px] font-medium text-white transition-colors hover:bg-accent-hover"
+            onClick={() => {
+              setUploadMultiple(false);
+              setUploadOpen(true);
+            }}
+            disabled={batchBusy}
+            className="h-[40px] rounded-[10px] bg-accent px-6 text-[13px] font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
           >
-            Upload an image
+            {batchBusy ? 'Uploading…' : 'Upload an image'}
           </button>
           <button
             type="button"
+            onClick={() => {
+              setUploadMultiple(true);
+              setUploadOpen(true);
+            }}
+            disabled={batchBusy}
+            className="h-[40px] rounded-[10px] border border-bordered px-6 text-[13px] font-medium text-secondary transition-colors hover:bg-raised disabled:opacity-50"
+          >
+            Upload multiple
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push('/templates')}
             className="h-[40px] rounded-[10px] border border-bordered px-6 text-[13px] font-medium text-secondary transition-colors hover:bg-raised"
           >
-            Try a sample
+            Template gallery
           </button>
         </div>
 
@@ -131,7 +167,8 @@ export default function Home() {
       <UploadModal
         open={uploadOpen}
         onClose={() => setUploadOpen(false)}
-        onUpload={handleUpload}
+        onUpload={(files) => void handleUpload(files)}
+        multiple={uploadMultiple}
       />
     </main>
   );

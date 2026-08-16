@@ -13,13 +13,20 @@ import {
 } from '@/components/editor/canvas-editor';
 import {
   createProject,
+  createShare,
   getJob,
   getProject,
+  getSharedProject,
   getToken,
+  listShares,
   listVersions,
   restoreVersion,
+  revokeShare,
   saveVersion,
+  shareUrl,
   updateProject,
+  updateSharedProject,
+  type Share,
   type Version,
 } from '@/lib/api';
 import { useSceneHistory } from '@/lib/editor/use-scene-history';
@@ -27,6 +34,8 @@ import { useSceneHistory } from '@/lib/editor/use-scene-history';
 interface EditorScreenProps {
   jobId: string | null;
   projectId?: string | null;
+  shareToken?: string | null;
+  templateId?: string | null;
 }
 
 function emptyScene(): SceneGraph {
@@ -40,34 +49,50 @@ function emptyScene(): SceneGraph {
   };
 }
 
-export function EditorScreen({ jobId, projectId }: EditorScreenProps) {
+export function EditorScreen({ jobId, projectId, shareToken, templateId }: EditorScreenProps) {
   const router = useRouter();
   const [initialScene] = useState<SceneGraph>(() => emptyScene());
   const history = useSceneHistory(initialScene);
   const { scene, commit, undo, redo, reset } = history;
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [loading, setLoading] = useState(Boolean(jobId) || Boolean(projectId));
+  const [loading, setLoading] = useState(Boolean(jobId) || Boolean(projectId) || Boolean(shareToken) || Boolean(templateId));
   const [loadError, setLoadError] = useState<string | null>(null);
   const editorRef = useRef<CanvasEditorHandle | null>(null);
 
   // cloud project state (v0.3 persistence)
   const [activeProjectId, setActiveProjectId] = useState<string | null>(projectId ?? null);
   const [projectName, setProjectName] = useState('Untitled design');
+  // shared-project state (v0.5)
+  const [shared, setShared] = useState<{ token: string; permission: 'view' | 'edit' } | null>(
+    null,
+  );
 
-  // load an existing project (preferred) or a finished job's scene graph
+  // load an existing project, finished job, shared design, or a template
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      if (!projectId && !jobId) return;
+      if (!projectId && !jobId && !shareToken && !templateId) return;
       setLoading(true);
       setLoadError(null);
       try {
-        if (projectId) {
+        if (shareToken) {
+          const sharedProject = await getSharedProject(shareToken);
+          if (cancelled) return;
+          setShared({ token: shareToken, permission: sharedProject.permission });
+          setProjectName(sharedProject.name);
+          reset(sharedProject.sceneGraph as unknown as SceneGraph);
+        } else if (projectId) {
           const project = await getProject(projectId);
           if (cancelled) return;
           setActiveProjectId(project.id);
           setProjectName(project.name);
           reset(project.sceneGraph as unknown as SceneGraph);
+        } else if (templateId) {
+          const { getTemplate } = await import('@/lib/api');
+          const template = await getTemplate(templateId);
+          if (cancelled) return;
+          setProjectName(template.name);
+          reset(template.sceneGraph as unknown as SceneGraph);
         } else {
           const job = await getJob(jobId!);
           if (cancelled) return;
@@ -86,7 +111,7 @@ export function EditorScreen({ jobId, projectId }: EditorScreenProps) {
     return () => {
       cancelled = true;
     };
-  }, [projectId, jobId, reset]);
+  }, [projectId, jobId, shareToken, templateId, reset]);
 
   // guard scene schema shape from older payloads
   const safeScene: SceneGraph = {
@@ -230,6 +255,7 @@ export function EditorScreen({ jobId, projectId }: EditorScreenProps) {
         editorRef={editorRef}
         activeProjectId={activeProjectId}
         projectName={projectName}
+        shared={shared}
         onProjectChange={(id, name) => {
           setActiveProjectId(id);
           setProjectName(name);
@@ -300,6 +326,7 @@ function Toolbar({
   editorRef,
   activeProjectId,
   projectName,
+  shared,
   onProjectChange,
   onRestoreScene,
   readScene,
@@ -312,6 +339,7 @@ function Toolbar({
   editorRef: React.RefObject<CanvasEditorHandle | null>;
   activeProjectId: string | null;
   projectName: string;
+  shared: { token: string; permission: 'view' | 'edit' } | null;
   onProjectChange: (id: string, name: string) => void;
   onRestoreScene: (scene: SceneGraph) => void;
   readScene: () => Record<string, unknown>;
@@ -322,18 +350,13 @@ function Toolbar({
   const [exporting, setExporting] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
 
-  async function handleExport(format: 'png' | 'jpg' | 'svg') {
+  async function handleExport(format: 'png' | 'jpg' | 'svg' | 'pdf') {
     setExportError(null);
     setExporting(format);
     try {
-      const { exportScene, saveProjectP2l } = await import('@/lib/api');
-      const canvas = editorRef.current;
-      const live = canvas?.readScene() ?? scene;
-      const blob =
-        format === 'svg'
-          ? await exportScene({ format, canvas: live.canvas, layers: live.layers, confidence: live.confidence, overallConfidence: live.overallConfidence })
-          : await exportScene({ format, canvas: live.canvas, layers: live.layers, confidence: live.confidence, overallConfidence: live.overallConfidence });
-      void saveProjectP2l;
+      const { exportScene } = await import('@/lib/api');
+      const live = editorRef.current?.readScene() ?? scene;
+      const blob = await exportScene({ format, canvas: live.canvas, layers: live.layers, confidence: live.confidence, overallConfidence: live.overallConfidence });
       triggerDownload(blob, `design.${format}`);
     } catch (e) {
       setExportError(e instanceof Error ? e.message : 'Export failed.');
@@ -350,6 +373,27 @@ function Toolbar({
       const live = editorRef.current?.readScene() ?? scene;
       const blob = await saveProjectP2l(live, 'design');
       triggerDownload(blob, 'design.p2l');
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : 'Save failed.');
+    } finally {
+      setExporting(null);
+    }
+  }
+
+  async function handleSaveAsTemplate() {
+    setExportError(null);
+    setExporting('template');
+    try {
+      const { createTemplate, getToken } = await import('@/lib/api');
+      if (!getToken()) {
+        router.push(`/login?redirect=${encodeURIComponent(window.location.href)}`);
+        return;
+      }
+      const name = window.prompt('Name this template', projectName);
+      if (!name?.trim()) return;
+      const live = editorRef.current?.readScene() ?? scene;
+      await createTemplate(name.trim(), live as unknown as Record<string, unknown>);
+      setExportError('Saved as template');
     } catch (e) {
       setExportError(e instanceof Error ? e.message : 'Save failed.');
     } finally {
@@ -459,12 +503,33 @@ function Toolbar({
       <CloudSaveControl
         activeProjectId={activeProjectId}
         projectName={projectName}
+        shared={shared}
         onProjectChange={onProjectChange}
         onRestoreScene={onRestoreScene}
         readScene={readScene}
       />
+      {!shared && (
+        <>
+          <div className="h-5 w-px bg-bordered" />
+          <button
+            type="button"
+            className={btn}
+            onClick={() => void handleSaveAsTemplate()}
+            disabled={exporting === 'template'}
+            title="Save this design as a reusable template"
+            data-testid="save-template-btn"
+          >
+            {exporting === 'template' ? 'Saving…' : 'Save as template'}
+          </button>
+          <ShareControl
+            activeProjectId={activeProjectId}
+            onProjectChange={onProjectChange}
+            readScene={readScene}
+          />
+        </>
+      )}
       <div className="h-5 w-px bg-bordered" />
-      {(['png', 'jpg', 'svg'] as const).map((f) => (
+      {(['png', 'jpg', 'svg', 'pdf'] as const).map((f) => (
         <button
           key={f}
           type="button"
@@ -512,12 +577,14 @@ function pickFile(): Promise<File | null> {
 function CloudSaveControl({
   activeProjectId,
   projectName,
+  shared,
   onProjectChange,
   onRestoreScene,
   readScene,
 }: {
   activeProjectId: string | null;
   projectName: string;
+  shared: { token: string; permission: 'view' | 'edit' } | null;
   onProjectChange: (id: string, name: string) => void;
   onRestoreScene: (scene: SceneGraph) => void;
   readScene: () => Record<string, unknown>;
@@ -527,6 +594,8 @@ function CloudSaveControl({
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+
+  const isViewOnly = shared?.permission === 'view';
 
   const refreshVersions = useCallback(async () => {
     if (!activeProjectId) {
@@ -556,7 +625,11 @@ function CloudSaveControl({
     setBusy('save');
     try {
       const sceneGraph = readScene();
-      if (!activeProjectId) {
+      if (shared) {
+        const { updateSharedProject } = await import('@/lib/api');
+        await updateSharedProject(shared.token, sceneGraph);
+        setStatus('Saved changes');
+      } else if (!activeProjectId) {
         const name = window.prompt('Name this project', projectName);
         if (!name?.trim()) return;
         const created = await createProject(name.trim(), sceneGraph);
@@ -616,31 +689,46 @@ function CloudSaveControl({
 
   return (
     <div className="relative flex items-center gap-1">
-      {activeProjectId && (
-        <span className="hidden max-w-[140px] truncate text-[11px] text-muted xl:inline" title={projectName}>
-          {projectName}
+      {shared ? (
+        <span
+          className={`rounded-[8px] px-2 py-1 text-[11px] font-medium ${
+            isViewOnly ? 'bg-raised text-muted' : 'bg-accent/10 text-accent'
+          }`}
+          title={isViewOnly ? 'This design is shared as view-only' : 'This design is shared for editing'}
+        >
+          {isViewOnly ? 'View only' : 'Shared · edit'}
         </span>
+      ) : (
+        activeProjectId && (
+          <span className="hidden max-w-[140px] truncate text-[11px] text-muted xl:inline" title={projectName}>
+            {projectName}
+          </span>
+        )
       )}
-      <button
-        type="button"
-        className={btn}
-        onClick={() => void handleSaveProject()}
-        disabled={busy !== null}
-        title="Save to your projects (sign in required)"
-        data-testid="save-project-btn"
-      >
-        {busy === 'save' ? 'Saving…' : activeProjectId ? 'Update project' : 'Save to projects'}
-      </button>
-      <button
-        type="button"
-        className={btn}
-        onClick={() => setOpen((v) => !v)}
-        disabled={!activeProjectId || busy !== null}
-        title={activeProjectId ? 'Versions & restore' : 'Save the project first'}
-        data-testid="versions-btn"
-      >
-        Versions {versions.length > 0 ? `(${versions.length})` : ''}
-      </button>
+      {!isViewOnly && (
+        <button
+          type="button"
+          className={btn}
+          onClick={() => void handleSaveProject()}
+          disabled={busy !== null}
+          title={shared ? 'Save changes to the shared design' : 'Save to your projects (sign in required)'}
+          data-testid="save-project-btn"
+        >
+          {busy === 'save' ? 'Saving…' : shared ? 'Save changes' : activeProjectId ? 'Update project' : 'Save to projects'}
+        </button>
+      )}
+      {!shared && (
+        <button
+          type="button"
+          className={btn}
+          onClick={() => setOpen((v) => !v)}
+          disabled={!activeProjectId || busy !== null}
+          title={activeProjectId ? 'Versions & restore' : 'Save the project first'}
+          data-testid="versions-btn"
+        >
+          Versions {versions.length > 0 ? `(${versions.length})` : ''}
+        </button>
+      )}
       {status && (
         <span className="ml-1 text-[12px] text-secondary" role="status">
           {status}
@@ -674,6 +762,181 @@ function CloudSaveControl({
                 <span className="text-muted">v{v.versionNo}</span>
               </button>
             ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// -- sharing ----------------------------------------------------------------
+
+function ShareControl({
+  activeProjectId,
+  onProjectChange,
+  readScene,
+}: {
+  activeProjectId: string | null;
+  onProjectChange: (id: string, name: string) => void;
+  readScene: () => Record<string, unknown>;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [shares, setShares] = useState<Share[]>([]);
+  const [permission, setPermission] = useState<'view' | 'edit'>('view');
+  const [busy, setBusy] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const refresh = useCallback(async () => {
+    if (!activeProjectId) return;
+    try {
+      setShares(await listShares(activeProjectId));
+    } catch {
+      // non-fatal
+    }
+  }, [activeProjectId]);
+
+  useEffect(() => {
+    if (open && activeProjectId) void refresh();
+  }, [open, activeProjectId, refresh]);
+
+  async function ensureProjectSaved(): Promise<string | null> {
+    if (activeProjectId) return activeProjectId;
+    const { createProject, getToken } = await import('@/lib/api');
+    if (!getToken()) {
+      router.push(`/login?redirect=${encodeURIComponent(window.location.href)}`);
+      return null;
+    }
+    const name = window.prompt('Name this project before sharing', 'Untitled design');
+    if (!name?.trim()) return null;
+    const created = await createProject(name.trim(), readScene());
+    onProjectChange(created.id, created.name);
+    router.replace(`/editor?project=${created.id}`, { scroll: false });
+    return created.id;
+  }
+
+  async function handleCreate() {
+    setStatus(null);
+    setBusy('create');
+    try {
+      const projectId = await ensureProjectSaved();
+      if (!projectId) return;
+      const share = await createShare(projectId, permission);
+      setShares(await listShares(projectId));
+      const link = shareUrl(share.token);
+      try {
+        await navigator.clipboard?.writeText(link);
+      } catch {
+        // clipboard may be blocked; the link is still shown in the list
+      }
+      setCopied(true);
+      setStatus('Share link copied to clipboard');
+      setTimeout(() => setCopied(false), 1500);
+    } catch (e) {
+      setStatus(e instanceof Error ? e.message : 'Share failed');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleRevoke(token: string) {
+    if (!activeProjectId) return;
+    setStatus(null);
+    setBusy(token);
+    try {
+      await revokeShare(activeProjectId, token);
+      await refresh();
+      setStatus('Share link revoked');
+    } catch (e) {
+      setStatus(e instanceof Error ? e.message : 'Revoke failed');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const btn =
+    'flex h-7 items-center justify-center gap-1 rounded-[8px] px-2 text-[12px] font-medium text-secondary transition-colors hover:bg-raised disabled:opacity-40';
+
+  return (
+    <div className="relative flex items-center">
+      <button
+        type="button"
+        className={btn}
+        onClick={() => setOpen((v) => !v)}
+        title="Share this design with a link"
+        data-testid="share-btn"
+      >
+        Share
+      </button>
+      {open && (
+        <div
+          className="absolute right-0 top-8 z-20 w-[300px] rounded-[12px] border border-bordered bg-surface p-3 shadow-xl"
+          data-testid="share-menu"
+        >
+          <p className="text-[13px] font-semibold">Share design</p>
+          <p className="mt-0.5 text-[12px] text-secondary">
+            Anyone with the link can {permission === 'edit' ? 'edit' : 'view'} this design.
+          </p>
+
+          <div className="mt-3 flex items-center gap-2">
+            <button
+              type="button"
+              className={`h-8 flex-1 rounded-[8px] text-[12px] font-medium transition-colors ${
+                permission === 'view' ? 'bg-raised text-primary' : 'text-secondary hover:bg-raised'
+              }`}
+              onClick={() => setPermission('view')}
+            >
+              View only
+            </button>
+            <button
+              type="button"
+              className={`h-8 flex-1 rounded-[8px] text-[12px] font-medium transition-colors ${
+                permission === 'edit' ? 'bg-raised text-primary' : 'text-secondary hover:bg-raised'
+              }`}
+              onClick={() => setPermission('edit')}
+            >
+              Can edit
+            </button>
+          </div>
+
+          <button
+            type="button"
+            className="mt-3 h-9 w-full rounded-[10px] bg-accent text-[13px] font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-40"
+            onClick={() => void handleCreate()}
+            disabled={busy === 'create'}
+            data-testid="create-share-btn"
+          >
+            {busy === 'create' ? 'Creating…' : copied ? 'Link copied!' : 'Create share link'}
+          </button>
+
+          {shares.length > 0 && (
+            <ul className="mt-3 flex flex-col gap-1">
+              {shares.map((s) => (
+                <li
+                  key={s.token}
+                  className="flex items-center justify-between gap-2 rounded-[8px] bg-raised px-2 py-1.5"
+                >
+                  <span className="truncate text-[12px] text-secondary">
+                    {s.permission === 'edit' ? 'Edit' : 'View'} · {s.token.slice(0, 8)}…
+                  </span>
+                  <button
+                    type="button"
+                    className="text-[11px] font-medium text-danger hover:underline"
+                    onClick={() => void handleRevoke(s.token)}
+                    disabled={busy === s.token}
+                  >
+                    {busy === s.token ? '…' : 'Revoke'}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {status && (
+            <p className="mt-2 text-[12px] text-secondary" role="status">
+              {status}
+            </p>
           )}
         </div>
       )}

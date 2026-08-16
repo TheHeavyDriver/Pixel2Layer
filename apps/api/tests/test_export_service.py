@@ -41,6 +41,15 @@ def test_svg_export_valid() -> None:
     assert '<rect width="100%"' in svg  # background
 
 
+def test_pdf_export_valid() -> None:
+    result = ExportService().to_pdf(_graph())
+    assert result.format == "pdf"
+    assert result.content_type == "application/pdf"
+    assert result.data[:5] == b"%PDF-"
+    # render to the rasterized page size: pdf medium = canvas points (200x150)
+    assert len(result.data) > 200
+
+
 def test_unsupported_format_rejected() -> None:
     import pytest
 

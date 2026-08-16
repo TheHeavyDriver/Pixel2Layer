@@ -6,7 +6,7 @@ const email = () => `e2e-${Date.now()}@example.com`;
 
 async function reconstruct(page: Page) {
   await page.goto('/');
-  await page.getByRole('button', { name: /Get started/ }).click();
+  await page.getByRole('button', { name: 'Upload an image' }).click();
   const modal = page.getByTestId('upload-modal');
   await expect(modal).toBeVisible();
   await modal.locator('input[type="file"]').setInputFiles(POSTER_PATH);

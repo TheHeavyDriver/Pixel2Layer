@@ -82,7 +82,7 @@ export async function getJob(jobId: string): Promise<JobResponse> {
 }
 
 export interface ExportOptions {
-  format: 'png' | 'jpg' | 'svg';
+  format: 'png' | 'jpg' | 'svg' | 'pdf';
   /** canvas width, height, background from the scene graph */
   canvas: { width: number; height: number; background: string | null };
   /** ordered back-to-front geometry in SceneGraphSchema form */
@@ -371,4 +371,130 @@ export async function subscribeToJob(
 
     signal?.addEventListener('abort', () => finish());
   });
+}
+
+// -- sharing ----------------------------------------------------------------
+
+export interface Share {
+  token: string;
+  projectId: string;
+  permission: 'view' | 'edit';
+  url: string;
+  createdAt: string;
+}
+
+export interface SharedProject {
+  id: string;
+  name: string;
+  sceneGraph: Record<string, unknown>;
+  sourceImage: string | null;
+  permission: 'view' | 'edit';
+  updatedAt: string;
+}
+
+export async function createShare(
+  projectId: string,
+  permission: 'view' | 'edit',
+): Promise<Share> {
+  return authFetch<Share>(`/api/projects/${projectId}/share`, {
+    method: 'POST',
+    body: JSON.stringify({ permission }),
+  });
+}
+
+export async function listShares(projectId: string): Promise<Share[]> {
+  return authFetch<Share[]>(`/api/projects/${projectId}/shares`);
+}
+
+export async function revokeShare(projectId: string, token: string): Promise<void> {
+  return authFetch<void>(`/api/projects/${projectId}/shares/${token}`, {
+    method: 'DELETE',
+  });
+}
+
+export function shareUrl(token: string): string {
+  return `${window.location.origin}/share/${token}`;
+}
+
+export async function getSharedProject(token: string): Promise<SharedProject> {
+  return handle<SharedProject>(await fetch(`${API_BASE}/api/share/${token}`));
+}
+
+export async function updateSharedProject(
+  token: string,
+  sceneGraph: Record<string, unknown>,
+): Promise<SharedProject> {
+  const res = await fetch(`${API_BASE}/api/share/${token}`, {
+    method: 'PATCH',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ sceneGraph }),
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => null);
+    throw new Error(detail?.detail ?? `Share update failed (${res.status})`);
+  }
+  return res.json();
+}
+
+// -- templates --------------------------------------------------------------
+
+export interface TemplateSummary {
+  id: string;
+  ownerId: string;
+  name: string;
+  sourceImage: string | null;
+  createdAt: string;
+}
+
+export interface Template extends TemplateSummary {
+  sceneGraph: Record<string, unknown>;
+}
+
+export async function createTemplate(
+  name: string,
+  sceneGraph: Record<string, unknown>,
+  sourceImage?: string,
+): Promise<Template> {
+  return authFetch<Template>('/api/templates', {
+    method: 'POST',
+    body: JSON.stringify({ name, sceneGraph, sourceImage }),
+  });
+}
+
+export async function listTemplates(): Promise<TemplateSummary[]> {
+  return handle<TemplateSummary[]>(await fetch(`${API_BASE}/api/templates`));
+}
+
+export async function getTemplate(templateId: string): Promise<Template> {
+  return handle<Template>(await fetch(`${API_BASE}/api/templates/${templateId}`));
+}
+
+export async function deleteTemplate(templateId: string): Promise<void> {
+  return authFetch<void>(`/api/templates/${templateId}`, { method: 'DELETE' });
+}
+
+// -- batches ----------------------------------------------------------------
+
+export interface BatchJob {
+  id: string;
+  uploadId: string;
+  status: 'queued' | 'running' | 'done' | 'failed';
+  stage: string;
+  progress: number;
+}
+
+export interface Batch {
+  id: string;
+  jobs: BatchJob[];
+}
+
+export async function createBatch(uploadIds: string[]): Promise<Batch> {
+  return authFetch<Batch>('/api/batches', {
+    method: 'POST',
+    body: JSON.stringify({ uploadIds }),
+  });
+}
+
+export async function getBatch(batchId: string): Promise<Batch> {
+  return authFetch<Batch>(`/api/batches/${batchId}`);
 }

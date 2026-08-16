@@ -23,7 +23,7 @@ class ExportResult:
 class ExportService:
     """Server-side rasterization of a scene graph to PNG/JPG/SVG, plus .p2l round-trip."""
 
-    EXPORTABLE = ("png", "jpg", "svg")
+    EXPORTABLE = ("png", "jpg", "svg", "pdf")
 
     # -- PNG / JPG -------------------------------------------------------------
     def rasterize(self, graph: SceneGraph, fmt: str, *, scale: float = 1.0) -> ExportResult:
@@ -50,6 +50,19 @@ class ExportService:
             buf = io.BytesIO()
             img.save(buf, format="PNG")
         return ExportResult(format=fmt, data=buf.getvalue(), content_type=f"image/{fmt}")
+
+    # -- PDF --------------------------------------------------------------------
+    def to_pdf(self, graph: SceneGraph, *, scale: float = 1.0) -> ExportResult:
+        """Embed a rasterized scene as a single-page PDF (v0.5)."""
+        width = int(graph.canvas["width"] * scale)
+        height = int(graph.canvas["height"] * scale)
+        if width <= 0 or height <= 0:
+            raise ExportError("canvas has invalid dimensions")
+        rgba = self.rasterize(graph, "png", scale=scale)
+        img = Image.open(io.BytesIO(rgba.data)).convert("RGB")
+        buf = io.BytesIO()
+        img.save(buf, format="PDF")
+        return ExportResult(format="pdf", data=buf.getvalue(), content_type="application/pdf")
 
     def _draw_elements(
         self, img: Image.Image, layers: list[SceneGraphElement], scale: float
