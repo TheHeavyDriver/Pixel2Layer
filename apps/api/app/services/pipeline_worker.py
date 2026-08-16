@@ -8,7 +8,16 @@ from app.services.pipeline import ReconstructionPipeline
 from app.services.storage import StorageBackend
 
 # Stages the worker reports to the queue; used to derive overall progress.
-PIPELINE_STAGES = ["uploading", "analyzing", "text", "shapes", "colors", "building"]
+PIPELINE_STAGES = [
+    "uploading",
+    "analyzing",
+    "text",
+    "shapes",
+    "colors",
+    "segmenting",
+    "vectorizing",
+    "building",
+]
 
 
 def build_worker(storage: StorageBackend):

@@ -15,6 +15,8 @@ import {
   type Object as FabricObject,
 } from 'fabric';
 
+import { API_BASE } from '@/lib/api';
+
 /** Fabric objects carry the originating scene element id so we can round-trip. */
 const ID_PROP = 'p2lId';
 const TYPE_PROP = 'p2lType';
@@ -416,7 +418,7 @@ export async function loadImageElement(
   element: SceneGraphElement & { type: 'image' },
 ): Promise<FabricWithMeta | null> {
   try {
-    const img = await FabricImage.fromURL(element.src, { crossOrigin: 'anonymous' });
+    const img = await FabricImage.fromURL(resolveSrc(element.src), { crossOrigin: 'anonymous' });
     img.set({
       left: element.transform.x,
       top: element.transform.y,
@@ -439,6 +441,14 @@ export async function loadImageElement(
 }
 
 export { ActiveSelection, FabricImage };
+
+/** Resolve a scene-element asset ref to a loadable URL.
+ *  Backend-emitted refs are API-relative (`/api/storage/...`); absolute URLs
+ *  and data URIs pass through unchanged. */
+export function resolveSrc(src: string): string {
+  if (src.startsWith('/')) return `${API_BASE}${src}`;
+  return src;
+}
 
 /** Serialize fabric path segments into an SVG path string for the scene graph. */
 function segmentsToPathString(segments: unknown): string {

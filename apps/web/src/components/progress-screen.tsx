@@ -110,11 +110,13 @@ export function ProgressScreen({ jobId, onDone, onCancel }: ProgressScreenProps)
           })}
 
           <div className="mt-4">
-            <div className="h-2 w-full overflow-hidden rounded-full bg-raised">
+            <div
+              className="h-2 w-full overflow-hidden rounded-full bg-raised"
+              data-testid="overall-progress"
+            >
               <div
                 className="h-full rounded-full bg-accent transition-all duration-300"
                 style={{ width: `${Math.round((job?.progress ?? 0) * 100)}%` }}
-                data-testid="overall-progress"
               />
             </div>
             <div className="mt-1 text-right font-mono text-[12px] text-secondary">

@@ -36,6 +36,7 @@ function emptyScene(): SceneGraph {
     layers: [],
     confidence: {},
     overallConfidence: 1,
+    complexity: null,
   };
 }
 

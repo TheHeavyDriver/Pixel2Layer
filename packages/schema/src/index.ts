@@ -139,4 +139,6 @@ export interface SceneGraph {
   confidence: Record<string, Confidence>;
   /** aggregate reconstruction quality 0..1 */
   overallConfidence: Confidence;
+  /** progressive-routing metadata (v0.4) */
+  complexity?: { kind?: 'graphic' | 'photographic'; score?: number } | null;
 }

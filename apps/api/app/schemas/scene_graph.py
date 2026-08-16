@@ -126,5 +126,6 @@ class SceneGraph(BaseModel):
     layers: list[SceneGraphElement]
     confidence: dict[str, float]
     overall_confidence: float = Field(..., alias="overallConfidence")
+    complexity: dict | None = Field(None, alias="complexity")
 
     model_config = {"populate_by_name": True}

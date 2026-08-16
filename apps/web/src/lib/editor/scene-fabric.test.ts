@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { Canvas, Group, Rect, Point, Textbox } from 'fabric';
+import { Canvas, Group, Path, Rect, Point, Textbox } from 'fabric';
 
 import {
   canvasToScene,
   elementToFabric,
   sceneToCanvas,
   fabricToElement,
+  resolveSrc,
 } from '@/lib/editor/scene-fabric';
 import type { SceneGraphElement } from '@pixel2layer/schema';
+import { API_BASE } from '@/lib/api';
 import { makeScene } from '@/test/fixtures';
 
 function makeCanvas(): Canvas {
@@ -203,5 +205,33 @@ describe('Point usage for polygons', () => {
     };
     const obj = elementToFabric(polygon as SceneGraphElement)!;
     expect(obj.type).toBe('polygon');
+  });
+});
+
+describe('v0.4: vectors and images', () => {
+  it('creates a fabric Path for a vector element', () => {
+    const scene = makeScene();
+    const vector = {
+      ...scene.layers[0],
+      id: 'vec-1',
+      type: 'vector' as const,
+      path: 'M 0 0 L 10 0 L 10 10 Z',
+      width: 10,
+      height: 10,
+    };
+    const obj = elementToFabric(vector as SceneGraphElement)!;
+    expect(obj.type).toBe('path');
+    expect(obj.get('p2lId')).toBe('vec-1');
+    expect((obj as Path).path as unknown).toBeTruthy();
+  });
+
+  it('resolves backend-relative image srcs against the API origin', () => {
+    expect(resolveSrc('/api/storage/masked/u1/0.png')).toBe(
+      `${API_BASE}/api/storage/masked/u1/0.png`,
+    );
+    expect(resolveSrc('https://cdn.example.com/a.png')).toBe(
+      'https://cdn.example.com/a.png',
+    );
+    expect(resolveSrc('data:image/png;base64,iVBOR')).toBe('data:image/png;base64,iVBOR');
   });
 });

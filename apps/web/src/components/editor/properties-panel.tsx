@@ -309,6 +309,56 @@ export function PropertiesPanel({
       );
     }
 
+    if (el.type === 'vector') {
+      return (
+        <>
+          <Section title="Fill">
+            <FillControls element={el} onUpdateElement={onUpdateElement} styleKey="fill" />
+          </Section>
+          <Section title="Geometry">
+            <Field label="Width">
+              <input
+                type="number"
+                min={1}
+                value={Math.round(el.width)}
+                onChange={(e) => {
+                  const v = num(e.target.value);
+                  if (Number.isFinite(v) && v > 0) onUpdateElement(el.id, { width: v });
+                }}
+                className="h-7 w-[72px] rounded-md border border-bordered bg-raised px-2 text-right font-mono text-[12px] focus:border-bordered-strong focus:outline-none"
+              />
+            </Field>
+            <Field label="Height">
+              <input
+                type="number"
+                min={1}
+                value={Math.round(el.height)}
+                onChange={(e) => {
+                  const v = num(e.target.value);
+                  if (Number.isFinite(v) && v > 0) onUpdateElement(el.id, { height: v });
+                }}
+                className="h-7 w-[72px] rounded-md border border-bordered bg-raised px-2 text-right font-mono text-[12px] focus:border-bordered-strong focus:outline-none"
+              />
+            </Field>
+          </Section>
+          <Section title="Path">
+            <textarea
+              value={el.path}
+              rows={4}
+              spellCheck={false}
+              onChange={(e) => onUpdateElement(el.id, { path: e.target.value })}
+              className="w-full resize-y rounded-md border border-bordered bg-raised p-2 font-mono text-[11px] leading-snug text-primary focus:border-bordered-strong focus:outline-none"
+              aria-label="SVG path"
+            />
+            <p className="mt-1 text-[11px] text-muted">
+              Editable SVG path data (M/L/C/Q/Z). Coordinates are local to the
+              element; origin sits at the element center.
+            </p>
+          </Section>
+        </>
+      );
+    }
+
     return (
       <Section title="Fill">
         <FillControls element={el} onUpdateElement={onUpdateElement} styleKey="fill" />
@@ -353,9 +403,15 @@ export function PropertiesPanel({
                   ? 'text-warning'
                   : 'text-danger'
             }`}
+            title={primary.confidenceNote ?? undefined}
           >
             {Math.round(primary.confidence * 100)}% confidence
           </span>
+          {primary.confidenceNote && (
+            <span className="ml-auto max-w-[120px] truncate text-[11px] text-muted" title={primary.confidenceNote}>
+              {primary.confidenceNote}
+            </span>
+          )}
         </div>
       )}
       {!multi && primary ? renderSingle(primary) : (
@@ -496,12 +552,63 @@ function CanvasProperties({
           </span>{' '}
           <span className="text-muted">overall</span>
         </p>
+        {scene.complexity?.kind && (
+          <p className="mt-1 flex items-center gap-1 font-mono text-[12px]">
+            <span className="capitalize text-secondary">{scene.complexity.kind}</span>
+            <span className="text-muted">
+              source ({scene.complexity.score != null
+                ? `${Math.round(scene.complexity.score * 100)}% complexity`
+                : 'detected'})
+            </span>
+          </p>
+        )}
         {Object.entries(scene.confidence).map(([key, value]) => (
           <p key={key} className="mt-1 flex justify-between font-mono text-[12px]">
             <span className="capitalize text-secondary">{key}</span>
-            <span className="text-muted">{Math.round(value * 100)}%</span>
+            <span
+              className={
+                value >= 0.8
+                  ? 'text-success'
+                  : value >= 0.5
+                    ? 'text-warning'
+                    : 'text-danger'
+              }
+            >
+              {Math.round(value * 100)}%
+            </span>
           </p>
         ))}
+        <div className="mt-2 border-t border-bordered pt-2">
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-muted">
+            Element confidence
+          </p>
+          {scene.layers.length === 0 ? (
+            <p className="font-mono text-[11px] text-muted">No layers</p>
+          ) : (
+            <ul className="max-h-40 space-y-0.5 overflow-y-auto">
+              {[...scene.layers].reverse().map((el) => (
+                <li
+                  key={el.id}
+                  className="flex items-center justify-between gap-2 font-mono text-[11px]"
+                  title={el.confidenceNote ?? undefined}
+                >
+                  <span className="min-w-0 truncate text-secondary">{el.name}</span>
+                  <span
+                    className={
+                      el.confidence >= 0.8
+                        ? 'text-success'
+                        : el.confidence >= 0.5
+                          ? 'text-warning'
+                          : 'text-danger'
+                    }
+                  >
+                    {Math.round(el.confidence * 100)}%
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </Section>
     </>
   );

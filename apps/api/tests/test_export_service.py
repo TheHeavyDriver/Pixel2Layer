@@ -103,3 +103,61 @@ def test_pipeline_result_is_schema_compliant() -> None:
     assert graph.schema_version == 1
     assert any(e.type == "circle" for e in graph.layers)
     assert graph.overall_confidence > 0.7
+
+
+def test_svg_export_renders_vector_path() -> None:
+    from app.schemas.scene_graph import Transform, VectorElement
+    from app.services.export_service import ExportService
+
+    graph = _graph()
+    graph.layers.append(
+        VectorElement(
+            id="v1",
+            type="vector",
+            name="Vector",
+            transform=Transform(x=100, y=75),
+            path="M 0 0 L 20 0 L 20 20 Z",
+            width=20,
+            height=20,
+            fill="#123456",
+            confidence=0.8,
+        )
+    )
+    svg = ExportService().to_svg(graph).data.decode("utf-8")
+    assert '<path d="M 0 0 L 20 0 L 20 20 Z"' in svg
+    assert 'transform="translate(100.0 75.0)"' in svg
+    assert 'fill="#123456"' in svg
+
+
+def test_png_export_renders_vector_as_filled_region() -> None:
+    from io import BytesIO
+
+    from PIL import Image
+
+    from app.schemas.scene_graph import Transform, VectorElement
+    from app.services.export_service import ExportService
+
+    graph = _graph()
+    graph.layers.append(
+        VectorElement(
+            id="v1",
+            type="vector",
+            name="Vector",
+            transform=Transform(x=40, y=30),
+            path="M 0 0 L 20 0 L 20 20 Z",
+            width=20,
+            height=20,
+            fill="#FF0000",
+            confidence=0.8,
+        )
+    )
+    data = ExportService().rasterize(graph, "png", scale=2).data
+    img = Image.open(BytesIO(data)).convert("RGBA")
+    # red pixels present near the vector bounds
+    reds = 0
+    for y in range(img.height):
+        for x in range(img.width):
+            r, g, b, _ = img.getpixel((x, y))
+            if r > 200 and g < 80 and b < 80:
+                reds += 1
+    assert reds > 10

@@ -7,6 +7,7 @@ from app.schemas.scene_graph import (
     SCENE_GRAPH_SCHEMA_VERSION,
     CircleElement,
     EllipseElement,
+    ImageElement,
     LineElement,
     PolygonElement,
     RectElement,
@@ -14,11 +15,13 @@ from app.schemas.scene_graph import (
     SceneGraphElement,
     TextElement,
     Transform,
+    VectorElement,
 )
 from app.services.color_extractor import Region
 from app.services.image_utils import LoadedImage
 from app.services.shape_detector import DetectedShape
 from app.services.text_detector import DetectedText
+from app.services.vectorizer import DetectedVector
 
 
 @dataclass
@@ -26,6 +29,16 @@ class DetectedElements:
     shapes: list[DetectedShape]
     regions: list[Region]
     texts: list[DetectedText]
+    vectors: list[DetectedVector] | None = None
+    images: list[ImageElement] | None = None
+
+
+@dataclass
+class BuildOptions:
+    """Pipeline-injected hints (progressive routing v0.4)."""
+
+    complexity_kind: str | None = None  # "graphic" | "photographic"
+    complexity_score: float | None = None  # 0 (simple) .. 1 (complex)
 
 
 class SceneGraphBuilder:
@@ -42,8 +55,10 @@ class SceneGraphBuilder:
         image: LoadedImage,
         detected: DetectedElements,
         background_fill: str | None = None,
+        options: BuildOptions | None = None,
     ) -> SceneGraph:
         elements: list[SceneGraphElement] = []
+        _ = options  # used by the pipeline for routing decisions; reserved here
 
         if background_fill:
             elements.append(
@@ -55,10 +70,21 @@ class SceneGraphBuilder:
             if elem is not None:
                 elements.append(elem)
 
+        for vector in detected.vectors or []:
+            elements.append(self._vector_to_element(vector))
+
+        for image_elem in detected.images or []:
+            elements.append(image_elem)
+
         for text in detected.texts:
             elements.append(self._text_to_element(text))
 
         confidence, overall = self._score(elements)
+        complexity = None
+        if options is not None and options.complexity_kind:
+            complexity = {"kind": options.complexity_kind}
+            if options.complexity_score is not None:
+                complexity["score"] = round(options.complexity_score, 4)
         graph = SceneGraph(
             schemaVersion=SCENE_GRAPH_SCHEMA_VERSION,
             canvas={
@@ -69,6 +95,7 @@ class SceneGraphBuilder:
             layers=elements,
             confidence=confidence,
             overallConfidence=overall,
+            complexity=complexity,
         )
         return graph
 
@@ -129,6 +156,20 @@ class SceneGraphBuilder:
                 points=[tuple(pt) for pt in p["points"]], **style,
             )
         return None
+
+    def _vector_to_element(self, vector: DetectedVector) -> VectorElement:
+        return VectorElement(
+            id=self._uid("vector"),
+            type="vector",
+            name="Vector",
+            transform=Transform(x=vector.x, y=vector.y),
+            path=vector.path,
+            width=vector.width,
+            height=vector.height,
+            fill=vector.fill,
+            confidence=vector.confidence,
+            confidenceNote="vector outline from contour tracing",
+        )
 
     def _text_to_element(self, text: DetectedText) -> TextElement:
         note = (
