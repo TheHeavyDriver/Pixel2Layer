@@ -4,7 +4,7 @@ import io
 import json
 from dataclasses import dataclass
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFont
 
 from app.schemas.scene_graph import SceneGraph, SceneGraphElement
 
@@ -103,7 +103,7 @@ class ExportService:
                 pts = [(p[0] * scale, p[1] * scale) for p in elem.points]
                 draw.polygon(pts, fill=_parse_hex(elem.fill) if elem.fill else None)
             elif elem.type == "vector":
-                self._draw_vector_path(draw, elem, scale)
+                self._draw_vector_path(img, draw, elem, scale)
             elif elem.type == "text":
                 self._draw_text(draw, elem)
             elif elem.type == "image":
@@ -125,23 +125,49 @@ class ExportService:
             draw.text((elem.transform.x, elem.transform.y), elem.content, fill=fill)
 
     def _draw_vector_path(
-        self, draw: ImageDraw.ImageDraw, elem, scale: float
+        self, img: Image.Image, draw: ImageDraw.ImageDraw, elem, scale: float
     ) -> None:
-        """Render an SVG `d` path as a filled polygon.
+        """Render an SVG `d` path into the raster image.
 
-        Supports the M/L/C/Q/A/Z commands our vectorizer emits (flat outlines).
-        Curves are flattened with a fixed sample rate; the result is
-        resolution-approximate, which is fine for raster preview of vectors.
+        Multi-subpath paths (our vectorizer's holes: ring interiors, letter
+        counters) are composited with an even-odd (XOR) rule so the interior is
+        punched out instead of over-filled. Single-subpath paths keep the fast
+        plain polygon fill.
         """
-        points = _flatten_path(elem.path, samples_per_unit=128 if scale > 4 else 64)
-        if len(points) < 3:
+        subpaths = _flatten_subpaths(
+            elem.path, samples_per_unit=128 if scale > 4 else 64
+        )
+        subpaths = [p for p in subpaths if len(p) >= 3]
+        if not subpaths:
             return
         fill = _parse_hex(elem.fill) if elem.fill else None
         if fill is None:
             return
         cx, cy = elem.transform.x * scale, elem.transform.y * scale
-        scaled = [(cx + (px * scale), cy + (py * scale)) for px, py in points]
-        draw.polygon(scaled, fill=fill)
+        scaled = [
+            [(cx + (px * scale), cy + (py * scale)) for px, py in sub] for sub in subpaths
+        ]
+
+        if len(scaled) == 1:
+            draw.polygon(scaled[0], fill=fill)
+            return
+
+        # Multi-subpath: XOR each subpath's fill into a region mask.
+        x0 = max(0, int(min(p[0] for sub in scaled for p in sub)))
+        y0 = max(0, int(min(p[1] for sub in scaled for p in sub)))
+        x1 = min(img.width, int(max(p[0] for sub in scaled for p in sub)) + 1)
+        y1 = min(img.height, int(max(p[1] for sub in scaled for p in sub)) + 1)
+        if x1 <= x0 or y1 <= y0:
+            return
+        mask = Image.new("L", (x1 - x0, y1 - y0), 0)
+        for sub in scaled:
+            layer = Image.new("L", (x1 - x0, y1 - y0), 0)
+            ImageDraw.Draw(layer).polygon(
+                [(p[0] - x0, p[1] - y0) for p in sub], fill=255
+            )
+            mask = ImageChops.logical_xor(mask.convert("1"), layer.convert("1"))
+        fill_px = fill + (255,) if img.mode == "RGBA" else fill + (255,)
+        img.paste(fill_px, (x0, y0), mask=mask.convert("L"))
 
     # -- SVG --------------------------------------------------------------------
     def to_svg(self, graph: SceneGraph) -> ExportResult:
@@ -187,7 +213,8 @@ class ExportService:
                 cx, cy = elem.transform.x, elem.transform.y
                 fill = elem.fill or "#000000"
                 parts.append(
-                    f'<path d="{elem.path}" transform="translate({cx} {cy})" fill="{fill}"/>'
+                    f'<path d="{elem.path}" fill-rule="evenodd" '
+                    f'transform="translate({cx} {cy})" fill="{fill}"/>'
                 )
             elif elem.type == "image":
                 # Raster-to-raster: reference the source via a data-less group so
@@ -236,13 +263,20 @@ class ExportService:
         return scene, payload.get("metadata", {})
 
 
-def _flatten_path(d: str, samples_per_unit: int = 64) -> list[tuple[float, float]]:
-    """Flatten an SVG path (M/L/C/Q/Z) into a closed point list."""
+def _flatten_subpaths(
+    d: str, samples_per_unit: int = 64
+) -> list[list[tuple[float, float]]]:
+    """Flatten an SVG path (M/L/C/Q/A/Z) into per-subpath point lists.
+
+    Every top-level `M` starts a new subpath (our vectorizer emits hole
+    interiors as extra `M…Z` segments), so consumers can apply even-odd fill.
+    """
     import math
 
     tokens = d.replace(",", " ").split()
     if not tokens:
         return []
+    subpaths: list[list[tuple[float, float]]] = []
     out: list[tuple[float, float]] = []
     cur = (0.0, 0.0)
     start: tuple[float, float] | None = None
@@ -258,16 +292,20 @@ def _flatten_path(d: str, samples_per_unit: int = 64) -> list[tuple[float, float
             cmd = token
             i += 1
             continue
-        if cmd in ("M", "L"):
+        if cmd == "M":
             x, y = num(i), num(i + 1)
             i += 2
-            if cmd == "M":
-                out.append((x, y))
-                start = (x, y)
-                cur = (x, y)
-            else:
-                out.append((x, y))
-                cur = (x, y)
+            if out:
+                subpaths.append(out)
+                out = []
+            out.append((x, y))
+            start = (x, y)
+            cur = (x, y)
+        elif cmd == "L":
+            x, y = num(i), num(i + 1)
+            i += 2
+            out.append((x, y))
+            cur = (x, y)
         elif cmd == "C":
             c1x, c1y, c2x, c2y = num(i), num(i + 1), num(i + 2), num(i + 3)
             x, y = num(i + 4), num(i + 5)
@@ -311,13 +349,15 @@ def _flatten_path(d: str, samples_per_unit: int = 64) -> list[tuple[float, float
             out.extend(pts)
             cur = (x, y)
         elif cmd == "Z":
-            if start:
+            if start and out and start != out[-1]:
                 out.append(start)
                 cur = start
             i += 1
         else:
             raise ValueError(f"unsupported SVG command: {cmd}")
-    return out
+    if out:
+        subpaths.append(out)
+    return subpaths
 
 
 def _arc_points(

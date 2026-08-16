@@ -63,6 +63,9 @@ Brief change log. Read first each session; append a short entry after every comm
 | 55 | 2026-08-16 | `implement v0.6 tools` | packages/schema/src/index.ts, apps/web/src/lib/api.ts, apps/web/src/lib/editor/scene-fabric.ts, apps/web/src/components/editor/{editor-screen,canvas-editor,properties-panel}.tsx, lib/api.test.ts, editor/scene-fabric.test.ts | Web: ImageElement.filters type; removeBackground+suggestGroups api helpers; sceneFiltersToFabric mapping (brightness/contrast/saturation/grayscale/invert/blur); loadImageElement/applyElementToFabric apply filters; groupByIds handle + Smart group toolbar action; ImageControls in properties panel (filters sliders/toggles/reset + background-removal button); +6 vitest → 51 |
 | 56 | 2026-08-16 | `verify` | apps/api apps/web | 97 pytest + 51 vitest + tsc + next build green; ruff clean |
 | 57 | 2026-08-16 | `document` | roadmap.md, README.md | Marked v0.4 harder-image + new image tools/smart grouping done; pruned done backlog items; wrote full README (architecture, setup, test) |
+| 58 | 2026-08-17 | `implement backlog: advanced vector reconstruction` | apps/api/app/services/vectorizer.py, apps/api/app/services/export_service.py, apps/api/tests/test_vectorizer_advanced.py | Vectorizer v1.1: per-color region decomposition (k-means-style nearest-centroid palette, bg exclusion, light-on-dark), hole subpaths via RETR_CCOMP reversed winding, corner-preserving quadratic-bezier smoothing; export renders multi-subpath paths with XOR even-odd raster fill + `fill-rule="evenodd"` SVG; 8 new tests → 105 pytest, ruff clean |
+| 59 | 2026-08-17 | `update roadmap` | roadmap.md, memory.md | Removed real-time collaboration + template monetization from backlog (project is free & open source); noted no marketplace/collab planned |
+| 60 | 2026-08-17 | `update roadmap` | roadmap.md, memory.md | Clarified web-only; removed native mobile/desktop apps from backlog |
 
 ## Files
 

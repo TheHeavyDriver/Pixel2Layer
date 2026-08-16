@@ -82,16 +82,15 @@ Goal: distribution and productivity.
 
 ## Post-MVP / Backlog
 
+Pixel2Layer is a web-only, completely free and open source app. No collaboration is planned (removed by decision), there will be no native mobile/desktop apps, and there will be no marketplace or template monetization.
+
 Ideas tracked for later, in priority order:
 
-- [ ] Real-time live collaboration (CRDT-based multiplayer editing)
-- [ ] Native mobile/desktop apps
-- [ ] Advanced vector reconstruction of complex illustrations
+- [x] Advanced vector reconstruction of complex illustrations (v1.1: per-color region decomposition, hole subpaths, bezier-smooth corners, light-on-dark & background exclusion)
 - [ ] Deeper SAM 2 fine-tuning for design-graphic segmentation quality
 - [ ] Font database expansion + better font matching
 - [ ] Advanced image editing (masks, region cropping) on segmented regions
 - [ ] Plugin SDK / component system / design-system features (auto-layout)
-- [ ] Marketplace, templates monetization
 
 ---
 
