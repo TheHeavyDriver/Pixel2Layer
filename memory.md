@@ -40,6 +40,11 @@ Brief change log. Read first each session; append a short entry after every comm
 | 32 | 2026-08-16 | `fix` | apps/web/src/lib/api.ts | SSE: resolve on terminal `update` event (done/failed), not just the trailing `done` event — Chromium emits ERR_INCOMPLETE_CHUNKED_ENCODING and drops it on fast jobs |
 | 33 | 2026-08-16 | `verify` | apps/web apps/api | Playwright e2e passes (full exit-criteria flow); 23 vitest, 43 pytest, tsc, ruff all green; .gitignore playwright artifacts |
 | 34 | 2026-08-16 | `commit` | — | `cecfae7 test(web): playwright e2e for core editor flow; fix SSE terminal event handling` — v0.2 checklist complete |
+| 35 | 2026-08-16 | `implement v0.3` | apps/api | Self-hosted auth: JWT (pyjwt) + PBKDF2 hashing (`services/auth.py`); Store abstraction users/projects/versions with memory + asyncpg Postgres impls + DDL (`services/store.py`); `POST /api/auth/{register,login}`, `GET /me`; `POST/GET/PATCH/DELETE /api/projects` + versions save/list/restore, user-scoped; get_current_user dep; db_backend + jwt settings; compose Postgres → host port 5434 |
+| 36 | 2026-08-16 | `implement v0.3` | apps/api/tests | +2 api routes, +auth service, +store → 16 new tests (auth + projects scoping/versions) → 59 pytest pass; ruff clean; live Postgres-backed E2E verified (register→CRUD→versions→restore→cross-user 404) |
+| 37 | 2026-08-16 | `implement v0.3` | apps/web | Auth client (register/login/logout/me, getToken/setToken, Bearer authFetch) + project/version API fns in `lib/api.ts`; /login + /signup pages; /dashboard (list/open/rename/delete, logout); editor loads `?project=`, CloudSaveControl (save/update project, versions menu, restore); home nav shows Sign in / My projects / Log out |
+| 38 | 2026-08-16 | `verify` | apps/web | 11 new vitest auth/project api tests (localStorage shim setup for jsdom) → 34 pass; tsc + build green; Playwright auth-flow e2e (signup→save project→version restore→dashboard reopen→logout) + core-flow pass (2/2); API e2e runs with DB_BACKEND=memory for hermeticity |
+| 39 | 2026-08-16 | `commit` | — | Milestone committed: `027724f feat(v0.3): auth, project persistence, and version history` — v0.3 auth & persistence complete (email/password JWT, project CRUD, version history, dashboard) |
 
 ## Files
 
