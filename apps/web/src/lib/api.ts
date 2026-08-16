@@ -193,7 +193,13 @@ export async function subscribeToJob(
       try {
         const data = JSON.parse((e as MessageEvent).data) as JobResponse;
         onUpdate(data);
-        if (data.status === 'done' || data.status === 'failed') terminal = data;
+        // the terminal snapshot's `update` event is the authoritative signal;
+        // the trailing `done` event can be dropped by the transport (e.g. an
+        // incomplete-chunk close in Chromium), so resolve here when possible.
+        if (data.status === 'done' || data.status === 'failed') {
+          terminal = data;
+          finish();
+        }
       } catch {
         // ignore malformed frames
       }

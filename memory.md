@@ -35,6 +35,11 @@ Brief change log. Read first each session; append a short entry after every comm
 | 27 | 2026-08-16 | `verify` | apps/web apps/api | Web typecheck + build pass; fabric v7 APIs verified in jsdom; API 43 tests pass; ruff clean |
 | 28 | 2026-08-16 | `commit` | — | Milestone committed: `237ec6e feat(v0.2): fabric editor, layers/properties panels, and export routes` |
 | 29 | 2026-08-16 | `implement v0.2` | apps/web | Vitest + jsdom + @testing-library/react + vitest-canvas-mock; vitest.config.ts; 23 web tests (history hook, scene-fabric round-trip/group flatten, api client); `web:test` script; fix null-2D-context via canvas mock |
+| 30 | 2026-08-16 | `commit` | — | `6994255 test(web): unit tests for scene-fabric bridge, history hook, and api client` |
+| 31 | 2026-08-16 | `implement v0.2` | apps/web | Playwright e2e: config (API 8000 + web 3000), core-flow.spec (upload→editor→edit→export PNG/SVG→save/open .p2l); fixture poster.png |
+| 32 | 2026-08-16 | `fix` | apps/web/src/lib/api.ts | SSE: resolve on terminal `update` event (done/failed), not just the trailing `done` event — Chromium emits ERR_INCOMPLETE_CHUNKED_ENCODING and drops it on fast jobs |
+| 33 | 2026-08-16 | `verify` | apps/web apps/api | Playwright e2e passes (full exit-criteria flow); 23 vitest, 43 pytest, tsc, ruff all green; .gitignore playwright artifacts |
+| 34 | 2026-08-16 | `commit` | — | v0.2 e2e + SSE fix committed |
 
 ## Files
 

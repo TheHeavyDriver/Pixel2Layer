@@ -11,24 +11,24 @@ Legend: v0.1, v0.2 ... = internal milestone tags; 🔬 = deep module to write te
 Goal: upload an image and end up with a fully editable design in the browser — no accounts required yet.
 
 ### v0.1 — Foundations & pipeline shell
-- [ ] Scaffold monorepo: `apps/web` (Next.js + TS + Tailwind) and `apps/api` (FastAPI)
-- [ ] Stand up Supabase (Storage + Postgres) and local dev env / docker-compose
-- [ ] **SceneGraphSchema** 🔬 — canonical JSON schema for element types, properties, layering, canvas metadata
-- [ ] **UploadService** 🔬 — accept PNG/JPG/JPEG/WebP, validate, store original, return reference
-- [ ] **JobQueue** 🔬 — async job lifecycle (queued → running → done/failed), progress, retries, completion notification
-- [ ] File upload flow wired to job creation + progress display in the web app
+- [x] Scaffold monorepo: `apps/web` (Next.js + TS + Tailwind) and `apps/api` (FastAPI)
+- [x] Stand up Supabase (Storage + Postgres) and local dev env / docker-compose
+- [x] **SceneGraphSchema** 🔬 — canonical JSON schema for element types, properties, layering, canvas metadata
+- [x] **UploadService** 🔬 — accept PNG/JPG/JPEG/WebP, validate, store original, return reference
+- [x] **JobQueue** 🔬 — async job lifecycle (queued → running → done/failed), progress, retries, completion notification
+- [x] File upload flow wired to job creation + progress display in the web app
 
 ### v0.2 — Reconstruction + editor
-- [ ] **TextDetector** 🔬 — OCR + font matching; editable text objects; vector-outline fallback when font confidence is low
-- [ ] **ShapeDetector** 🔬 — circles, ellipses, rectangles, rounded rects, lines, polygons
-- [ ] **ColorExtractor** 🔬 — dominant colors + gradients per region
-- [ ] **SceneGraphBuilder** 🔬 — compose detected elements into ordered scene graph
-- [ ] **ExportService** — PNG / JPG / SVG export; `.p2l` save/load round-trip 🔬
-- [ ] **CanvasEditor** — Fabric.js canvas: select, move, resize, rotate, duplicate, delete, multi-select, group/ungroup, align/distribute; undo/redo
-- [ ] **LayersPanel** — select, hide/show, lock, reorder, rename, duplicate, delete
-- [ ] **PropertiesPanel** — text / shape / image property editing
-- [ ] Foundation of **ConfidenceScorer** — per-element confidence surfaced in the API model (full UI later in Phase 3)
-- [ ] e2e tests for the core editor flow
+- [x] **TextDetector** 🔬 — OCR + font matching; editable text objects; vector-outline fallback when font confidence is low
+- [x] **ShapeDetector** 🔬 — circles, ellipses, rectangles, rounded rects, lines, polygons
+- [x] **ColorExtractor** 🔬 — dominant colors + gradients per region
+- [x] **SceneGraphBuilder** 🔬 — compose detected elements into ordered scene graph
+- [x] **ExportService** — PNG / JPG / SVG export; `.p2l` save/load round-trip 🔬
+- [x] **CanvasEditor** — Fabric.js canvas: select, move, resize, rotate, duplicate, delete, multi-select, group/ungroup, align/distribute; undo/redo
+- [x] **LayersPanel** — select, hide/show, lock, reorder, rename, duplicate, delete
+- [x] **PropertiesPanel** — text / shape / image property editing
+- [x] Foundation of **ConfidenceScorer** — per-element confidence surfaced in the API model (full UI later in Phase 3)
+- [x] e2e tests for the core editor flow
 
 **Exit criteria:** user uploads a flat poster and edits its text, shape colors, and layout in the browser, then exports PNG/SVG and reopens the saved design.
 
