@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+:root {
+  /* frontend-design.md §1.3 tokens */
+  --bg-base: #0f0f10;
+  --bg-surface: #1a1b1d;
+  --bg-raised: #232427;
+  --border-default: #2e2f33;
+  --border-strong: #3d3f45;
+  --text-primary: #f4f4f5;
+  --text-secondary: #a1a1aa;
+  --text-muted: #64646c;
+  --accent: #6c8eff;
+  --accent-hover: #5675e8;
+  --success: #4cc38a;
+  --warning: #e8b04b;
+  --danger: #e5484d;
+  --info: #5e8bc9;
+  --canvas-drop: rgba(17, 18, 20, 0.97);
+}
+
+@theme inline {
+  --color-base: var(--bg-base);
+  --color-surface: var(--bg-surface);
+  --color-raised: var(--bg-raised);
+  --color-bordered: var(--border-default);
+  --color-bordered-strong: var(--border-strong);
+  --color-primary: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --color-canvas-drop: var(--canvas-drop);
+}
+
+body {
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+}
+
+/* Scrollbars §1.8 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}

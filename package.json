@@ -1,0 +1,19 @@
+{
+  "name": "pixel2layer",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Recover the design behind the image — image-to-editable-design platform.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "web": "npm run dev --workspace=apps/web",
+    "web:build": "npm run build --workspace=apps/web",
+    "web:lint": "npm run lint --workspace=apps/web",
+    "schema:types": "npm run types --workspace=packages/schema"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
