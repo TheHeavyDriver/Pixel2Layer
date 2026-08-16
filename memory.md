@@ -33,6 +33,8 @@ Brief change log. Read first each session; append a short entry after every comm
 | 25 | 2026-08-16 | `implement v0.2` | apps/web/src/components/editor/{canvas-editor.tsx,layers-panel.tsx,properties-panel.tsx,editor-screen.tsx} | Fabric canvas editor w/ imperative handle, layers panel (rename/eye/lock/reorder), properties panel, editor screen + toolbar (undo/redo/group/align/zoom/export) |
 | 26 | 2026-08-16 | `implement v0.2` | apps/web/src/app/editor/page.tsx, apps/web/src/lib/api.ts | Editor page now renders EditorScreen (jobId from searchParams); api.ts: getJob, exportScene, saveProjectP2l, importProjectP2l |
 | 27 | 2026-08-16 | `verify` | apps/web apps/api | Web typecheck + build pass; fabric v7 APIs verified in jsdom; API 43 tests pass; ruff clean |
+| 28 | 2026-08-16 | `commit` | — | Milestone committed: `237ec6e feat(v0.2): fabric editor, layers/properties panels, and export routes` |
+| 29 | 2026-08-16 | `implement v0.2` | apps/web | Vitest + jsdom + @testing-library/react + vitest-canvas-mock; vitest.config.ts; 23 web tests (history hook, scene-fabric round-trip/group flatten, api client); `web:test` script; fix null-2D-context via canvas mock |
 
 ## Files
 

@@ -11,6 +11,7 @@
     "web": "npm run dev --workspace=apps/web",
     "web:build": "npm run build --workspace=apps/web",
     "web:lint": "npm run lint --workspace=apps/web",
+    "web:test": "npm run test --workspace=apps/web",
     "schema:types": "npm run types --workspace=packages/schema"
   },
   "engines": {
