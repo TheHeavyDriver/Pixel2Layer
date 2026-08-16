@@ -8,7 +8,7 @@ Pixel-perfect SVG reconstruction of any artwork. Upload a PNG/JPG, and Pixel2Lay
 - **Layered editor** — canvas-based editor with vector (SVG path), shape, text, and image layers; full transform/arrange/alignment controls
 - **Progressive routing** — simple logos take the fast vector path, complex photos get masked region segmentation
 - **Confidence scoring** — per-element confidence badges plus an overall reconstruction summary
-- **Image tools** — background removal and filters (brightness, contrast, saturation, grayscale, invert, blur)
+- **Image tools** — background removal, filters (brightness, contrast, saturation, grayscale, invert, blur), and region editing (detect, crop, keep, cut) on segmented regions
 - **Smart layer grouping** — one-click grouping of headers, hero sections, products, and decorations
 - **Export** — PNG, JPEG, SVG, and PDF
 - **Sharing & templates** — shareable editable links, template gallery, batch processing
@@ -57,4 +57,4 @@ See [roadmap.md](roadmap.md) for the phased plan (v0.1→v0.5 done, plus a prior
 
 ## License
 
-Proprietary.
+Free and open source.

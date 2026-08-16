@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from 'react';
 
+import type { RegionsResult } from '@/lib/api';
 import type { SceneGraph, SceneGraphElement } from '@pixel2layer/schema';
 
 interface PropertiesPanelProps {
@@ -490,7 +491,7 @@ function FillControls({
   );
 }
 
-// -- image layer tools (v0.6 backlog) ----------------------------------------
+// -- image layer tools -------------------------------------------------------
 
 function ImageControls({
   element,
@@ -501,6 +502,10 @@ function ImageControls({
 }) {
   const [removing, setRemoving] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
+  const [regions, setRegions] = useState<RegionsResult | null>(null);
+  const [detecting, setDetecting] = useState(false);
+  const [regionAction, setRegionAction] = useState<number | null>(null);
+  const [regionError, setRegionError] = useState<string | null>(null);
   const filters = element.filters ?? {};
 
   const setFilter = (
@@ -526,6 +531,53 @@ function ImageControls({
       setRemoveError(e instanceof Error ? e.message : 'Background removal failed.');
     } finally {
       setRemoving(false);
+    }
+  }
+
+  async function currentBlob(): Promise<Blob> {
+    const { resolveSrc } = await import('@/lib/editor/scene-fabric');
+    const blob = await (await fetch(resolveSrc(element.src))).blob();
+    return blob;
+  }
+
+  async function handleDetectRegions() {
+    setDetecting(true);
+    setRegionError(null);
+    setRegions(null);
+    try {
+      const { detectRegions } = await import('@/lib/api');
+      const blob = await currentBlob();
+      setRegions(await detectRegions(blob));
+    } catch (e) {
+      setRegionError(e instanceof Error ? e.message : 'Region detection failed.');
+    } finally {
+      setDetecting(false);
+    }
+  }
+
+  async function applyRegionEdit(
+    index: number,
+    edit: 'crop' | 'keep' | 'remove',
+  ) {
+    setRegionAction(index);
+    setRegionError(null);
+    try {
+      const { cropRegion, maskRegion } = await import('@/lib/api');
+      const blob = await currentBlob();
+      const result =
+        edit === 'crop'
+          ? await cropRegion(blob, index)
+          : await maskRegion(blob, index, edit);
+      onUpdateElement(element.id, {
+        src: result.url,
+        width: result.width,
+        height: result.height,
+        filters: undefined,
+      } as Partial<SceneGraphElement>);
+    } catch (e) {
+      setRegionError(e instanceof Error ? e.message : 'Region edit failed.');
+    } finally {
+      setRegionAction(null);
     }
   }
 
@@ -593,6 +645,71 @@ function ImageControls({
         )}
         <p className="mt-1 text-[11px] text-muted">
           Approximate foreground cutout (OpenCV segmentation).
+        </p>
+      </Section>
+      <Section title="Regions">
+        <button
+          type="button"
+          className="h-8 w-full rounded-[8px] border border-bordered bg-raised text-[12px] font-medium text-secondary transition-colors hover:bg-raised disabled:opacity-40"
+          onClick={() => void handleDetectRegions()}
+          disabled={detecting}
+          data-testid="detect-regions-btn"
+        >
+          {detecting ? 'Detecting…' : regions ? 'Re-detect regions' : 'Detect regions'}
+        </button>
+        {regionError && (
+          <p className="mt-1 text-[11px] text-danger" role="alert">
+            {regionError}
+          </p>
+        )}
+        {regions && regions.regions.length === 0 && (
+          <p className="mt-1 text-[11px] text-muted">No foreground regions detected.</p>
+        )}
+        {regions && regions.regions.length > 0 && (
+          <ul className="mt-2 space-y-1">
+            {regions.regions.map((r, i) => (
+              <li
+                key={i}
+                className="flex items-center justify-between gap-2 rounded-md border border-bordered bg-raised px-2 py-1"
+              >
+                <span className="min-w-0 truncate font-mono text-[11px] text-secondary">
+                  #{i} · {r.width}×{r.height}
+                </span>
+                <span className="flex shrink-0 gap-1">
+                  <button
+                    type="button"
+                    className="rounded px-1.5 py-0.5 text-[11px] font-medium text-secondary transition-colors hover:bg-bordered disabled:opacity-40"
+                    onClick={() => void applyRegionEdit(i, 'crop')}
+                    disabled={regionAction !== null}
+                    data-testid={`region-crop-${i}`}
+                  >
+                    Crop
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded px-1.5 py-0.5 text-[11px] font-medium text-secondary transition-colors hover:bg-bordered disabled:opacity-40"
+                    onClick={() => void applyRegionEdit(i, 'keep')}
+                    disabled={regionAction !== null}
+                    data-testid={`region-keep-${i}`}
+                  >
+                    Keep
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded px-1.5 py-0.5 text-[11px] font-medium text-secondary transition-colors hover:bg-bordered disabled:opacity-40"
+                    onClick={() => void applyRegionEdit(i, 'remove')}
+                    disabled={regionAction !== null}
+                    data-testid={`region-remove-${i}`}
+                  >
+                    Cut
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="mt-1 text-[11px] text-muted">
+          Select a detected region to crop, keep, or cut out.
         </p>
       </Section>
     </>

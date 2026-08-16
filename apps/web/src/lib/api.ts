@@ -554,3 +554,69 @@ export async function suggestGroups(scene: {
   const parsed = (await res.json()) as { groups: GroupSuggestion[] };
   return parsed.groups;
 }
+
+// -- region editing (v0.7 backlog) -------------------------------------------
+
+export interface RegionInfo {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  label: string;
+  confidence: number;
+}
+
+export interface RegionsResult {
+  width: number;
+  height: number;
+  regions: RegionInfo[];
+}
+
+export type RegionMaskMode = 'keep' | 'remove';
+
+/** Detect foreground regions of an image so the editor can offer region
+ *  keep/remove/crop actions. */
+export async function detectRegions(file: Blob): Promise<RegionsResult> {
+  const form = new FormData();
+  form.append('file', file, 'image.png');
+  const res = await fetch(`${API_BASE}/api/tools/regions`, {
+    method: 'POST',
+    body: form,
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => null);
+    throw new Error(detail?.detail ?? `Region detection failed (${res.status})`);
+  }
+  return res.json();
+}
+
+async function regionEdit(
+  endpoint: 'region-crop' | 'region-mask',
+  file: Blob,
+  index: number,
+  mode?: RegionMaskMode,
+): Promise<BackgroundRemovalResult> {
+  const url = `${API_BASE}/api/tools/${endpoint}?index=${encodeURIComponent(index)}${mode ? `&mode=${encodeURIComponent(mode)}` : ''}`;
+  const form = new FormData();
+  form.append('file', file, 'image.png');
+  const res = await fetch(url, { method: 'POST', body: form });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => null);
+    throw new Error(detail?.detail ?? `${endpoint} failed (${res.status})`);
+  }
+  return res.json();
+}
+
+/** Crop an image to a single detected region's bounding box. */
+export async function cropRegion(file: Blob, index: number): Promise<BackgroundRemovalResult> {
+  return regionEdit('region-crop', file, index);
+}
+
+/** Mask an image with a single detected region (keep or remove its pixels). */
+export async function maskRegion(
+  file: Blob,
+  index: number,
+  mode: RegionMaskMode,
+): Promise<BackgroundRemovalResult> {
+  return regionEdit('region-mask', file, index, mode);
+}

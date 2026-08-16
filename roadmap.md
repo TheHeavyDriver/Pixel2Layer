@@ -89,7 +89,7 @@ Ideas tracked for later, in priority order:
 - [x] Advanced vector reconstruction of complex illustrations (v1.1: per-color region decomposition, hole subpaths, bezier-smooth corners, light-on-dark & background exclusion)
 - [ ] Deeper SAM 2 fine-tuning for design-graphic segmentation quality
 - [ ] Font database expansion + better font matching
-- [ ] Advanced image editing (masks, region cropping) on segmented regions
+- [x] Advanced image editing (masks, region cropping) on segmented regions — region detection + per-region crop/keep/cut tools in the editor
 - [ ] Plugin SDK / component system / design-system features (auto-layout)
 
 ---

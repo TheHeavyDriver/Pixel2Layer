@@ -3,9 +3,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   API_BASE,
   createJob,
+  cropRegion,
+  detectRegions,
   exportScene,
   getJob,
   importProjectP2l,
+  maskRegion,
   removeBackground,
   suggestGroups,
   uploadImage,
@@ -119,6 +122,65 @@ describe('api client', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ detail: 'No foreground found' }, 422));
 
     await expect(removeBackground(new Blob(['x']))).rejects.toThrow('No foreground found');
+  });
+
+  it('detectRegions posts the file and returns regions', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        { width: 160, height: 120, regions: [{ x: 26, y: 16, width: 30, height: 30, label: 'foreground', confidence: 0.55 }] },
+        200,
+      ),
+    );
+
+    const out = await detectRegions(new Blob(['png'], { type: 'image/png' }));
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${API_BASE}/api/tools/regions`);
+    expect(init.method).toBe('POST');
+    expect((init.body as FormData).get('file')).toBeInstanceOf(Blob);
+    expect(out.regions[0].confidence).toBe(0.55);
+  });
+
+  it('detectRegions throws on a non-2xx response', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ detail: 'could not decode image' }, 400));
+
+    await expect(detectRegions(new Blob(['x']))).rejects.toThrow('could not decode image');
+  });
+
+  it('cropRegion posts file with selected index', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ url: '/api/storage/assets/region-crop-1.png', key: 'assets/region-crop-1.png', width: 30, height: 30 }, 200),
+    );
+
+    const out = await cropRegion(new Blob(['png'], { type: 'image/png' }), 1);
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${API_BASE}/api/tools/region-crop?index=1`);
+    expect(init.method).toBe('POST');
+    expect(out.width).toBe(30);
+  });
+
+  it('maskRegion sends mode=keep', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ url: '/api/storage/assets/region-mask-1.png', key: 'assets/region-mask-1.png', width: 160, height: 120 }, 200),
+    );
+
+    const out = await maskRegion(new Blob(['png'], { type: 'image/png' }), 0, 'keep');
+
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${API_BASE}/api/tools/region-mask?index=0&mode=keep`);
+    expect(out.key).toContain('region-mask');
+  });
+
+  it('maskRegion sends mode=remove', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ url: '/api/storage/assets/region-mask-2.png', key: 'assets/region-mask-2.png', width: 160, height: 120 }, 200),
+    );
+
+    await maskRegion(new Blob(['png'], { type: 'image/png' }), 2, 'remove');
+
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${API_BASE}/api/tools/region-mask?index=2&mode=remove`);
   });
 });
 
