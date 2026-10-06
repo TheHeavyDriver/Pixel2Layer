@@ -87,8 +87,9 @@ Pixel2Layer is a web-only, completely free and open source app. No collaboration
 Ideas tracked for later, in priority order:
 
 - [x] Advanced vector reconstruction of complex illustrations (v1.1: per-color region decomposition, hole subpaths, bezier-smooth corners, light-on-dark & background exclusion)
-- [ ] Deeper SAM 2 fine-tuning for design-graphic segmentation quality
-- [ ] Font database expansion + better font matching
+- [x] Deeper SAM 2 fine-tuning for design-graphic segmentation quality (pseudo-label dataset builder from pipeline outputs; LoRA fine-tuning CLI `python -m app.services.finetune.train`; Sam2Segmenter
+  runtime backend wired into the pipeline with graceful fallback to the OpenCV VisionSegmenter) 🔬
+- [x] Font database expansion + better font matching (curated sans/serif/mono/display database resolved via fontconfig; silhouette-IoU template matching of OCR text — family + regular/bold weight, light-on-dark support, confidence-note score, PNG/PDF export with the matched font) 🔬
 - [x] Advanced image editing (masks, region cropping) on segmented regions — region detection + per-region crop/keep/cut tools in the editor
 - [ ] Plugin SDK / component system / design-system features (auto-layout)
 
