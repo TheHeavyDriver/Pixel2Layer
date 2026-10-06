@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -112,6 +113,34 @@ class VisionSegmenter(SegmenterBackend):
         return med
 
 
-def build_segmenter(backend: SegmenterBackend | None = None) -> SegmenterBackend:
-    """Factory that returns the configured backend (VisionSegmenter default)."""
-    return backend or VisionSegmenter()
+def build_segmenter(backend: SegmenterBackend | None = None, settings=None) -> SegmenterBackend:
+    """Factory for the configured segmentation backend.
+
+    Order of preference:
+      1. An explicitly supplied ``backend``.
+      2. The fine-tuned SAM 2 backend, when the app settings point at existing
+         LoRA weights and torch + sam2 are installed.
+      3. The lightweight ``VisionSegmenter`` (default, no heavy deps).
+    """
+    if backend is not None:
+        return backend
+
+    from app.services.finetune.sam2_segmenter import Sam2Segmenter
+
+    cfg = settings if settings is not None else _default_settings()
+    if cfg.sam2_lora_weights and Path(cfg.sam2_lora_weights).exists():
+        candidate = Sam2Segmenter(
+            checkpoint=cfg.sam2_checkpoint,
+            model_cfg=cfg.sam2_model_cfg,
+            lora_weights=cfg.sam2_lora_weights,
+            device=cfg.sam2_device,
+        )
+        if candidate.available():
+            return candidate
+    return VisionSegmenter()
+
+
+def _default_settings():
+    from app.core.config import get_settings
+
+    return get_settings()

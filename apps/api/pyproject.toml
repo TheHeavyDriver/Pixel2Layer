@@ -27,6 +27,13 @@ dev = [
     "ruff>=0.6",
 ]
 
+[project.optional-dependencies]
+train = [
+    "torch>=2.2",
+    "torchvision>=0.17",
+    "sam2>=1.0.2",
+]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]

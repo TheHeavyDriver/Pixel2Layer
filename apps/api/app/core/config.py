@@ -39,6 +39,22 @@ class Settings(BaseSettings):
     max_upload_bytes: int = 25 * 1024 * 1024  # 25MB per frontend spec
     allowed_content_types: list[str] = ["image/png", "image/jpeg", "image/webp"]
 
+    # SAM 2 fine-tuned segmentation (see app/services/finetune)
+    # Base SAM 2 checkpoint for the image encoder/predictor.
+    sam2_checkpoint: Path = BASE_DIR / "data" / "finetune" / "weights" / "sam2.1_hiera_small.pt"
+    # SAM 2 model config id from the sam2 package (e.g. "sam2.1_hiera_small").
+    sam2_model_cfg: str = "sam2.1_hiera_small"
+    # Fine-tuned LoRA weights used at runtime. When set and loadable, the
+    # pipeline uses the Sam2Segmenter backend; otherwise it falls back to the
+    # lightweight OpenCV VisionSegmenter.
+    sam2_lora_weights: Path | None = None
+    sam2_device: str = ""  # "" = auto (cuda if available else cpu)
+
+    # Fine-tuning dataset/output locations (used by the training CLI).
+    finetune_raw_dir: Path = BASE_DIR / "data" / "finetune" / "raw"
+    finetune_dataset_dir: Path = BASE_DIR / "data" / "finetune" / "datasets"
+    finetune_out_dir: Path = BASE_DIR / "data" / "finetune" / "weights"
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
