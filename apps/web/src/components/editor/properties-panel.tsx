@@ -2,6 +2,11 @@
 
 import { useState, type ReactNode } from 'react';
 
+import {
+  FONT_CATEGORY_LABELS,
+  designFontListWith,
+  type DesignFontCategory,
+} from '@/lib/design-fonts';
 import type { RegionsResult } from '@/lib/api';
 import type { SceneGraph, SceneGraphElement } from '@pixel2layer/schema';
 
@@ -10,6 +15,29 @@ interface PropertiesPanelProps {
   selectedIds: string[];
   onUpdateElement: (id: string, patch: Partial<SceneGraphElement>) => void;
   onUpdateCanvas: (patch: Partial<SceneGraph['canvas']>) => void;
+}
+
+function fontOptions(family: string | undefined) {
+  const entries = designFontListWith(family);
+  const groups = new Map<DesignFontCategory, { family: string }[]>();
+  for (const entry of entries) {
+    const list = groups.get(entry.category) ?? [];
+    list.push(entry);
+    groups.set(entry.category, list);
+  }
+  return (
+    <>
+      {[...groups.entries()].map(([category, list]) => (
+        <optgroup key={category} label={FONT_CATEGORY_LABELS[category]}>
+          {list.map((entry) => (
+            <option key={entry.family} value={entry.family}>
+              {entry.family}
+            </option>
+          ))}
+        </optgroup>
+      ))}
+    </>
+  );
 }
 
 function Section({
@@ -127,11 +155,7 @@ export function PropertiesPanel({
                 onChange={(e) => onUpdateElement(el.id, { fontFamily: e.target.value })}
                 className="h-7 w-full rounded-md border border-bordered bg-raised px-2 text-[12px] text-primary focus:border-bordered-strong focus:outline-none"
               >
-                <option value="sans-serif">Sans-serif</option>
-                <option value="Arial">Arial</option>
-                <option value="Georgia">Georgia</option>
-                <option value="monospace">Monospace</option>
-                <option value="Impact">Impact</option>
+                {fontOptions(el.fontFamily)}
               </select>
             </Field>
             <Field label="Size">

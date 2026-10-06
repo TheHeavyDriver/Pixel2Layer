@@ -172,12 +172,22 @@ class SceneGraphBuilder:
         )
 
     def _text_to_element(self, text: DetectedText) -> TextElement:
-        note = (
-            "text region detected; content will be recovered when OCR is enabled"
-            if text.is_guess
-            else "OCR text"
-        )
+        if text.is_guess:
+            note = (
+                "text region detected; content will be recovered when OCR is enabled"
+            )
+            font_family = "sans-serif"
+            font_weight = 400
+            font_style = "normal"
+        else:
+            note = f"OCR text; {text.font_note or 'font guessed'}"
+            font_family = text.font_family or "sans-serif"
+            font_weight = text.font_weight or 400
+            font_style = text.font_style or "normal"
         stroke = text.font_color
+        confidence = text.confidence
+        if text.font_match_score is not None:
+            confidence = min(1.0, max(text.confidence, text.font_match_score))
         return TextElement(
             id=self._uid("text"),
             type="text",
@@ -187,12 +197,13 @@ class SceneGraphBuilder:
                 rotation=text.rotation,
             ),
             content=text.content or "(text)",
-            fontFamily="sans-serif",
+            fontFamily=font_family,
             fontSize=text.font_size_estimate or max(12.0, text.height),
-            fontWeight=400,
+            fontWeight=font_weight,
+            fontStyle=font_style,
             fill=stroke,
             width=text.width,
-            confidence=text.confidence,
+            confidence=confidence,
             confidenceNote=note,
         )
 

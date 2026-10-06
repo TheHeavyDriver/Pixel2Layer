@@ -23,6 +23,12 @@ class DetectedText:
     background_color: str | None = None
     font_size_estimate: float = 0.0
     is_guess: bool = False  # True when content couldn't be read (region only)
+    # Font match results (filled by the FontMatcher, never by detection).
+    font_family: str = "sans-serif"
+    font_weight: int = 400
+    font_style: str = "normal"
+    font_match_score: float | None = None
+    font_note: str | None = None
 
 
 class OCRBackend(ABC):

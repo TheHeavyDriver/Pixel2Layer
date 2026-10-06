@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import io
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -11,6 +12,7 @@ from PIL import Image
 
 from app.schemas.scene_graph import ImageElement, Transform
 from app.services.color_extractor import ColorExtractor
+from app.services.fonts.matching import FontMatcher
 from app.services.image_utils import LoadedImage, hexify, load_image
 from app.services.progressive import ImageComplexity, ProgressiveRouter
 from app.services.scene_graph_builder import DetectedElements, SceneGraphBuilder
@@ -21,6 +23,8 @@ from app.services.text_detector import VisionTextDetector
 from app.services.vectorizer import Vectorizer
 
 ProgressFn = Callable[[str, float, float | None], Awaitable[None]]
+
+_FONT_MATCHER_DEFAULT = object()
 
 
 @dataclass
@@ -48,6 +52,7 @@ class ReconstructionPipeline:
         vectorizer: Vectorizer | None = None,
         segmenter_backend=None,
         router: ProgressiveRouter | None = None,
+        font_matcher: FontMatcher | None = _FONT_MATCHER_DEFAULT,
     ) -> None:
         self.storage = storage
         self.shape_detector = shape_detector or ShapeDetector()
@@ -57,6 +62,9 @@ class ReconstructionPipeline:
         self.vectorizer = vectorizer or Vectorizer()
         self.segmenter = build_segmenter(segmenter_backend)
         self.router = router or ProgressiveRouter()
+        if font_matcher is _FONT_MATCHER_DEFAULT:
+            font_matcher = FontMatcher()
+        self.font_matcher = font_matcher
 
     async def run(
         self, image_bytes: bytes, upload_id: str, progress: ProgressFn
@@ -72,6 +80,9 @@ class ReconstructionPipeline:
         await progress("text", 0.0, None)
         texts = await self.text_detector.detect(image)
         await progress("text", 1.0, None)
+
+        if self.font_matcher is not None:
+            await asyncio.to_thread(self._match_text_fonts, image, texts)
 
         await progress("shapes", 0.0, None)
         shapes = self.shape_detector.detect(image)
@@ -120,6 +131,10 @@ class ReconstructionPipeline:
             complexity_kind=complexity.kind,
             complexity_score=complexity.score,
         )
+
+    def _match_text_fonts(self, image: LoadedImage, texts) -> None:
+        for text in texts:
+            self.font_matcher.enhance(image, text)
 
     async def _segment(self, image: LoadedImage, upload_id: str) -> list[ImageElement]:
         """Segmented foregrounds → masked PNG cutouts stored for later use."""

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from PIL import Image, ImageChops, ImageDraw, ImageFont
 
 from app.schemas.scene_graph import SceneGraph, SceneGraphElement
+from app.services.fonts.registry import FontRegistry, default_font_registry
 
 
 class ExportError(ValueError):
@@ -24,6 +25,9 @@ class ExportService:
     """Server-side rasterization of a scene graph to PNG/JPG/SVG, plus .p2l round-trip."""
 
     EXPORTABLE = ("png", "jpg", "svg", "pdf")
+
+    def __init__(self, font_registry: FontRegistry | None = None) -> None:
+        self.font_registry = font_registry or default_font_registry()
 
     # -- PNG / JPG -------------------------------------------------------------
     def rasterize(self, graph: SceneGraph, fmt: str, *, scale: float = 1.0) -> ExportResult:
@@ -114,11 +118,18 @@ class ExportService:
         fill = _parse_hex(elem.fill) if elem.fill else (0, 0, 0, 255)
         try:
             size = int(elem.font_size * 0.62) or 12
+            font = None
+            if self.font_registry is not None:
+                font = self.font_registry.truetype(
+                    elem.font_family, elem.font_weight, size
+                )
+            if font is None:
+                font = _load_default_font(size)
             draw.text(
                 (elem.transform.x, elem.transform.y - size / 2),
                 elem.content,
                 fill=fill,
-                font=_load_default_font(size),
+                font=font,
                 anchor="lm",
             )
         except (ValueError, OSError):
@@ -228,6 +239,7 @@ class ExportService:
                 parts.append(
                     f'<text x="{elem.transform.x}" y="{elem.transform.y}" '
                     f'font-family="{elem.font_family}" font-size="{elem.font_size}" '
+                    f'font-weight="{elem.font_weight}" '
                     f'text-anchor="middle" fill="{elem.fill or "#000"}">'
                     f"{_escape(elem.content)}</text>"
                 )
