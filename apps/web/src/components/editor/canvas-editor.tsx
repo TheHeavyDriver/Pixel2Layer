@@ -77,14 +77,23 @@ export const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
       canvas.selectionBorderColor = '#6C8EFF';
       canvas.selectionLineWidth = 1;
       fabricRef.current = canvas;
+      // Fresh canvas instance → force the next scene sync to actually run
+      // (the previous instance may have already stamped `lastSyncedRef`).
+      lastSyncedRef.current = '';
       return () => {
-        canvas.dispose();
+        // Detach first so any in-flight async sync bails out on the identity
+        // check below instead of touching a disposed canvas.
         fabricRef.current = null;
+        canvas.dispose();
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const fitToViewport = useCallback((canvas: Canvas) => {
+      // `getElement()` reads `canvas.elements.lower.el`, which is undefined
+      // once the canvas has been disposed (unmount / remount / HMR). Only
+      // fit the instance that is currently live.
+      if (fabricRef.current !== canvas) return;
       const el = canvas.getElement();
       const viewW = el.clientWidth || 800;
       const viewH = el.clientHeight || 600;
@@ -109,7 +118,8 @@ export const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
         const key = JSON.stringify(next);
         if (key === lastSyncedRef.current) return;
         lastSyncedRef.current = key;
-        await sceneToCanvas(next, canvas);
+        await sceneToCanvas(next, canvas, () => fabricRef.current === canvas);
+        if (fabricRef.current !== canvas) return; // disposed while loading
         fitToViewport(canvas);
       },
       [fitToViewport],
@@ -299,10 +309,13 @@ export const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
               ...sceneRef.current,
               layers: [...sceneRef.current.layers, element],
             };
-            sceneToCanvas(sceneRef.current, canvas).then(() => {
-              fitToViewport(canvas);
-              readAndSync();
-            });
+            sceneToCanvas(sceneRef.current, canvas, () => fabricRef.current === canvas).then(
+              () => {
+                if (fabricRef.current !== canvas) return;
+                fitToViewport(canvas);
+                readAndSync();
+              },
+            );
           },
 
           readScene() {

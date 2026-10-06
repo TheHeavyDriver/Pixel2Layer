@@ -70,6 +70,26 @@ describe('sceneToCanvas + canvasToScene round trip', () => {
     const topId = canvas.getObjects()[2]?.get('p2lId');
     expect(topId).toBe('cir-1');
   });
+
+  it('skips all work when the canvas is already stale (isCurrent=false)', async () => {
+    const scene = makeScene();
+    const canvas = makeCanvas();
+
+    await sceneToCanvas(scene, canvas, () => false);
+
+    expect(canvas.getObjects()).toHaveLength(0);
+  });
+
+  it('stops syncing at the next check once the canvas goes stale', async () => {
+    const scene = makeScene();
+    const canvas = makeCanvas();
+    let calls = 0;
+    // first check passes → rect added; second check fails → loop bails out
+    await sceneToCanvas(scene, canvas, () => calls++ < 1);
+
+    expect(canvas.getObjects()).toHaveLength(1);
+    expect(canvas.getObjects()[0].get('p2lId')).toBe('rect-1');
+  });
 });
 
 describe('fabricToElement', () => {

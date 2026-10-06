@@ -29,7 +29,18 @@ export interface FabricWithMeta extends FabricObject {
   [LOCK_PROP]?: boolean;
 }
 
-export async function sceneToCanvas(scene: SceneGraph, canvas: Canvas): Promise<void> {
+/**
+ * Populate a Fabric canvas from a scene graph.
+ *
+ * `isCurrent` is an optional liveness check invoked after each `await`; when it
+ * returns false the canvas has been disposed (editor unmounted/remounted) and
+ * the remaining work is skipped instead of mutating a dead canvas.
+ */
+export async function sceneToCanvas(
+  scene: SceneGraph,
+  canvas: Canvas,
+  isCurrent: () => boolean = () => true,
+): Promise<void> {
   canvas.setDimensions({ width: scene.canvas.width, height: scene.canvas.height });
   canvas.backgroundColor = scene.canvas.background ?? 'transparent';
 
@@ -46,17 +57,20 @@ export async function sceneToCanvas(scene: SceneGraph, canvas: Canvas): Promise<
   }
 
   for (const element of scene.layers) {
+    if (!isCurrent()) return;
     const existingObj = existing.get(element.id);
     if (existingObj) {
       applyElementToFabric(existingObj, element);
     } else if (element.type === 'image') {
       const loaded = await loadImageElement(element);
-      if (loaded) canvas.add(loaded);
+      if (loaded && isCurrent()) canvas.add(loaded);
     } else {
       const built = elementToFabric(element);
       if (built) canvas.add(built);
     }
   }
+
+  if (!isCurrent()) return;
 
   // Keep z-order in sync with scene.layers (back-to-front) regardless of edits.
   scene.layers.forEach((element, index) => {
