@@ -41,9 +41,27 @@ def test_graphic_pipeline_runs_vectorizing_stage() -> None:
     )
     result, stages = _run(pipe, to_png_bytes(img))
     assert "vectorizing" in stages
+    # Option B: graphics also run the segmenting stage now.
+    assert "segmenting" in stages
     graph = SceneGraph.model_validate(result.scene_graph)
     assert any(e.type == "rectangle" for e in graph.layers)
     assert graph.canvas["background"] is not None
+    # Merged output: no cutout stacked under a covering vector path.
+    vectors = [e for e in graph.layers if e.type == "vector"]
+    images = [e for e in graph.layers if e.type == "image"]
+    for img_elem in images:
+        cx, cy = img_elem.transform.x, img_elem.transform.y
+        ix0, iy0 = cx - img_elem.width / 2, cy - img_elem.height / 2
+        ix1, iy1 = cx + img_elem.width / 2, cy + img_elem.height / 2
+        area = (ix1 - ix0) * (iy1 - iy0)
+        for vec in vectors:
+            vx, vy = vec.transform.x, vec.transform.y
+            vx0, vy0 = vx - vec.width / 2, vy - vec.height / 2
+            vx1, vy1 = vx + vec.width / 2, vy + vec.height / 2
+            inter = max(0.0, min(ix1, vx1) - max(ix0, vx0)) * max(
+                0.0, min(iy1, vy1) - max(iy0, vy0)
+            )
+            assert inter / area < 0.6
 
 
 def test_vectorizer_adds_vector_elements_for_irregular_blob() -> None:

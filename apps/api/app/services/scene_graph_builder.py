@@ -70,11 +70,11 @@ class SceneGraphBuilder:
             if elem is not None:
                 elements.append(elem)
 
-        for vector in detected.vectors or []:
-            elements.append(self._vector_to_element(vector))
-
-        for image_elem in detected.images or []:
-            elements.append(image_elem)
+        vectors = [self._vector_to_element(v) for v in detected.vectors or []]
+        images = list(detected.images or [])
+        vectors, images = _merge_vectors_and_cutouts(vectors, images)
+        elements.extend(vectors)
+        elements.extend(images)
 
         for text in detected.texts:
             elements.append(self._text_to_element(text))
@@ -217,3 +217,49 @@ class SceneGraphBuilder:
     @staticmethod
     def _uid(prefix: str) -> str:
         return f"{prefix}_{uuid.uuid4().hex[:8]}"
+
+
+# Overlap coverage at which a vector path and a masked cutout are considered
+# the same visual element (option B merge).
+_MERGE_COVERAGE = 0.6
+
+
+def _element_bbox(elem: SceneGraphElement) -> tuple[float, float, float, float]:
+    """Axis-aligned bbox from the element's center transform + size."""
+    hw = elem.width / 2.0
+    hh = elem.height / 2.0
+    cx = elem.transform.x
+    cy = elem.transform.y
+    return (cx - hw, cy - hh, cx + hw, cy + hh)
+
+
+def _merge_vectors_and_cutouts(
+    vectors: list[VectorElement], images: list[ImageElement]
+) -> tuple[list[VectorElement], list[ImageElement]]:
+    """Drop stacked duplicates where a vector path covers a masked cutout.
+
+    When a cutout's bbox is mostly covered by a vector's bbox, both describe
+    the same element, so only one layer survives: the higher-confidence one,
+    preferring the editable vector on ties.
+    """
+    drop_vectors: set[int] = set()
+    drop_images: set[int] = set()
+    for i, img in enumerate(images):
+        ix0, iy0, ix1, iy1 = _element_bbox(img)
+        image_area = max(0.0, (ix1 - ix0) * (iy1 - iy0))
+        if image_area <= 0:
+            continue
+        for j, vec in enumerate(vectors):
+            vx0, vy0, vx1, vy1 = _element_bbox(vec)
+            inter = max(0.0, min(ix1, vx1) - max(ix0, vx0)) * max(
+                0.0, min(iy1, vy1) - max(iy0, vy0)
+            )
+            if inter / image_area >= _MERGE_COVERAGE:
+                if vec.confidence >= img.confidence:
+                    drop_images.add(i)
+                else:
+                    drop_vectors.add(j)
+    return (
+        [v for j, v in enumerate(vectors) if j not in drop_vectors],
+        [im for i, im in enumerate(images) if i not in drop_images],
+    )

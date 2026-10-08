@@ -70,8 +70,13 @@ class ProgressiveRouter:
         return complexity.kind == "graphic" and complexity.edge_density > 0.008
 
     def should_segment(self, complexity: ImageComplexity) -> bool:
-        """Segment when the image is photographic/complex (raster fallback)."""
-        return complexity.kind == "photographic"
+        """Segment every image (raster fallback for all kinds).
+
+        Graphics used to skip segmentation, but vector paths and masked
+        cutouts can cover the same element, so the pipeline now always
+        segments and lets SceneGraphBuilder merge overlaps (option B).
+        """
+        return True
 
     def _flat_ratio(self, gray: np.ndarray) -> float:
         h, w = gray.shape

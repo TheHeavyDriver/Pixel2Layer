@@ -7,7 +7,7 @@ from app.services.progressive import ProgressiveRouter
 from tests.fixtures import make_poster, to_png_bytes
 
 
-def test_flat_graphics_routes_to_vectorize_not_segment() -> None:
+def test_flat_graphics_routes_to_vectorize_and_segment() -> None:
     img = make_poster(
         width=240, height=180, bg=(240, 240, 240),
         shapes=[
@@ -19,7 +19,8 @@ def test_flat_graphics_routes_to_vectorize_not_segment() -> None:
     complexity = ProgressiveRouter().classify(image)
     assert complexity.kind == "graphic"
     assert ProgressiveRouter().should_vectorize(complexity) is True
-    assert ProgressiveRouter().should_segment(complexity) is False
+    # Option B: graphics also segment; the builder merges vector/cutout overlaps.
+    assert ProgressiveRouter().should_segment(complexity) is True
 
 
 def test_photograph_routes_to_segment() -> None:
