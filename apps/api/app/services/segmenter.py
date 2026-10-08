@@ -51,20 +51,50 @@ class VisionSegmenter(SegmenterBackend):
         min_region_area: float = 200.0,
         max_regions: int = 40,
         bg_tolerance: int = 28,
+        grabcut_iterations: int = 3,
     ) -> None:
         self.min_region_area = min_region_area
         self.max_regions = max_regions
         self.bg_tolerance = bg_tolerance
+        self.grabcut_iterations = grabcut_iterations
 
     def available(self) -> bool:
         return True
 
     def segment(self, image: LoadedImage) -> list[SegmentedRegion]:
         background = self._background_color(image.bgr)
-        diff = cv2.absdiff(image.bgr, background.astype(np.uint8))
-        dist = diff.max(axis=2)
-        fg = (dist > self.bg_tolerance).astype(np.uint8) * 255
+        dist = _color_distance(image.bgr, background)
 
+        # Attempt 1: fixed-tolerance separation from the border color.
+        regions = self._extract_regions(
+            _fixed_mask(dist, self.bg_tolerance), confidence=0.55
+        )
+        if regions:
+            return regions
+
+        # Attempt 2: adaptive (Otsu) threshold on the same distance map.
+        # Recovers images where the fixed tolerance is too tight/loose, e.g.
+        # foreground touching the border so the border median is polluted.
+        otsu = _otsu_mask(dist)
+        if otsu is not None:
+            regions = self._extract_regions(otsu, confidence=0.5)
+            if regions:
+                return regions
+
+        # Attempt 3: GrabCut with the border as sure-background.
+        # Handles full-bleed photos and textured backgrounds where no single
+        # border color describes the background.
+        grabcut = self._grabcut_mask(image)
+        if grabcut is not None:
+            regions = self._extract_regions(grabcut, confidence=0.45)
+            if regions:
+                return regions
+        return []
+
+    def _extract_regions(
+        self, fg: np.ndarray, confidence: float
+    ) -> list[SegmentedRegion]:
+        """Split a binary foreground mask into disjoint regions."""
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
         fg = cv2.morphologyEx(fg, cv2.MORPH_OPEN, kernel, iterations=1)
         fg = cv2.morphologyEx(fg, cv2.MORPH_CLOSE, kernel, iterations=2)
@@ -88,7 +118,7 @@ class VisionSegmenter(SegmenterBackend):
                     height=int(h),
                     mask=mask,
                     label="foreground",
-                    confidence=0.55,
+                    confidence=confidence,
                 )
             )
         return regions
@@ -111,6 +141,62 @@ class VisionSegmenter(SegmenterBackend):
             )
         med = np.median(samples, axis=0)
         return med
+
+    def _grabcut_mask(self, image: LoadedImage) -> np.ndarray | None:
+        """Foreground mask via GrabCut, border strip as sure-background."""
+        h, w = image.bgr.shape[:2]
+        edge = max(1, min(4, h // 2, w // 2))
+        if h - 2 * edge <= 0 or w - 2 * edge <= 0:
+            return None
+        mask = np.full((h, w), cv2.GC_PR_FGD, dtype=np.uint8)
+        mask[:edge, :] = cv2.GC_BGD
+        mask[-edge:, :] = cv2.GC_BGD
+        mask[:, :edge] = cv2.GC_BGD
+        mask[:, -edge:] = cv2.GC_BGD
+        bgd_model = np.zeros((1, 65), dtype=np.float64)
+        fgd_model = np.zeros((1, 65), dtype=np.float64)
+        try:
+            cv2.grabCut(
+                image.rgb,
+                mask,
+                None,
+                bgd_model,
+                fgd_model,
+                self.grabcut_iterations,
+                cv2.GC_INIT_WITH_MASK,
+            )
+        except cv2.error:
+            return None
+        fg = ((mask == cv2.GC_FGD) | (mask == cv2.GC_PR_FGD)).astype(np.uint8) * 255
+        if not _sane_fraction(fg):
+            return None
+        return fg
+
+
+def _color_distance(bgr: np.ndarray, background: np.ndarray) -> np.ndarray:
+    """Per-pixel distance (0..255) from the estimated background color."""
+    diff = cv2.absdiff(bgr, background.astype(np.uint8))
+    return diff.max(axis=2)
+
+
+def _fixed_mask(dist: np.ndarray, tolerance: int) -> np.ndarray:
+    return (dist > tolerance).astype(np.uint8) * 255
+
+
+def _otsu_mask(dist: np.ndarray) -> np.ndarray | None:
+    """Adaptive threshold on the distance map; None when degenerate."""
+    if dist.max() == 0:
+        return None
+    _, fg = cv2.threshold(dist, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    if not _sane_fraction(fg):
+        return None
+    return fg
+
+
+def _sane_fraction(fg: np.ndarray) -> bool:
+    """Reject empty and full-bleed masks (nothing to split into regions)."""
+    frac = float(fg.mean() / 255.0)
+    return 0.01 < frac < 0.9
 
 
 def build_segmenter(backend: SegmenterBackend | None = None, settings=None) -> SegmenterBackend:

@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 
 from app.services.image_utils import load_image
-from app.services.segmenter import VisionSegmenter
+from app.services.segmenter import VisionSegmenter, _color_distance, _fixed_mask
 from app.services.vectorizer import Vectorizer
 from tests.fixtures import make_poster, to_png_bytes
 
@@ -57,3 +57,34 @@ def test_segmenter_marks_solid_background_as_no_regions() -> None:
     image = load_image(to_png_bytes(img))
     regions = VisionSegmenter(min_region_area=50).segment(image)
     assert regions == []
+
+
+def test_segmenter_recovers_low_contrast_foreground_via_adaptive_fallback() -> None:
+    # Object differs from the background by less than the fixed tolerance,
+    # so attempt 1 finds nothing; the Otsu fallback must still recover it.
+    img = make_poster(width=200, height=150, bg=(200, 200, 200))
+    cv2.circle(img, (100, 75), 30, (220, 220, 220), thickness=-1)
+    image = load_image(to_png_bytes(img))
+
+    assert VisionSegmenter(min_region_area=100, bg_tolerance=28)._extract_regions(
+        _fixed_mask(
+            _color_distance(image.bgr, VisionSegmenter._background_color(image.bgr)),
+            28,
+        ),
+        confidence=0.55,
+    ) == []
+    regions = VisionSegmenter(min_region_area=100, bg_tolerance=28).segment(image)
+    assert len(regions) >= 1
+    assert regions[0].confidence == 0.5
+    assert regions[0].width > 10 and regions[0].height > 10
+
+
+def test_segmenter_grabcut_masks_foreground() -> None:
+    img = make_poster(width=200, height=150, bg=(240, 240, 240))
+    cv2.circle(img, (100, 75), 30, (200, 40, 40), thickness=-1)
+    image = load_image(to_png_bytes(img))
+
+    fg = VisionSegmenter()._grabcut_mask(image)
+    assert fg is not None
+    frac = float(fg.mean() / 255.0)
+    assert 0.01 < frac < 0.9
