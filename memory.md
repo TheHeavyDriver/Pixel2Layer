@@ -77,6 +77,7 @@ Brief change log. Read first each session; append a short entry after every comm
 | 69 | 2026-09-28 | `fix broken venv shebangs` | apps/api/.venv/* | Project dir renamed Projects→projects broke 2214 venv files (shebangs + editable finder); rewrote old path in all text files; pip install -e .[dev] + 143 pytest + ruff green |
 | 70 | 2026-09-28 | `fix canvas-editor runtime TypeError` | apps/web/src/components/editor/canvas-editor.tsx, src/lib/editor/scene-fabric.ts, scene-fabric.test.ts | Race: async syncFromScene/addElement resumed fitToViewport on a disposed Fabric canvas (`getElement()` → `elements.lower` undefined) after unmount/remount/HMR; added canvas-identity guards, lastSynced reset on canvas recreate, optional isCurrent() in sceneToCanvas; +2 vitest → 62 pass, tsc/build green, 5 e2e pass (installed chromium); pre-existing: `npm run lint` broken (next lint removed in Next 16) |
 | 71 | 2026-10-06 | `commit` | — | 5 commits: SAM2 LoRA backend, font matching, docs + backlog, PERT chart, canvas dispose-race fix; 143 pytest + 62 vitest green; reverted generated next-env.d.ts churn |
+| 72 | 2026-10-08 | `implement B and C` | apps/api/app/services/{progressive,scene_graph_builder,segmenter}.py, tests/test_{progressive,pipeline_v04,scene_graph_builder,vectorizer_segmenter}.py | Fix segmentation into layers: always segment (B) + builder vector/cutout overlap merge (higher confidence wins, vector on ties); VisionSegmenter fallback chain (C): fixed-tolerance → Otsu → GrabCut; +6 pytest → 149 pass, ruff clean |
 
 ## Files
 
