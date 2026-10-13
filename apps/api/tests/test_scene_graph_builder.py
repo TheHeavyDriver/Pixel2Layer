@@ -43,6 +43,27 @@ def test_builds_ordered_scene_graph() -> None:
     assert graph.overall_confidence > 0
 
 
+def test_builds_line_element_without_fill_collision() -> None:
+    # Regression: the line branch unpacked style (which carries fill) after an
+    # explicit fill="none" -> TypeError on any detected line shape.
+    img = load_image(to_png_bytes(make_poster(width=200, height=150)))
+    detected = DetectedElements(
+        shapes=[
+            _dummy_shape(
+                "line", x1=10.0, y1=20.0, x2=180.0, y2=130.0,
+                stroke_width=4.0, stroke="#112233",
+            )
+        ],
+        regions=[],
+        texts=[],
+    )
+    graph = SceneGraphBuilder().build(img, detected, background_fill="#FFFFFF")
+    lines = [layer for layer in graph.layers if layer.type == "line"]
+    assert len(lines) == 1
+    assert lines[0].fill == "none"
+    assert lines[0].stroke == "#112233"
+
+
 def test_builds_text_element() -> None:
     img = load_image(to_png_bytes(make_poster(width=100, height=80)))
     detected = DetectedElements(

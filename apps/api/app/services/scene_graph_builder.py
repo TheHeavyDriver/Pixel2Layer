@@ -147,7 +147,7 @@ class SceneGraphBuilder:
                 transform=Transform(x=0, y=0),
                 x1=p["x1"], y1=p["y1"], x2=p["x2"], y2=p["y2"],
                 stroke=p.get("stroke"), strokeWidth=p.get("stroke_width"),
-                fill="none", **style,
+                fill="none", confidence=shape.confidence,  # not **style: duplicate fill kwarg
             )
         if shape.kind == "polygon":
             return PolygonElement(
