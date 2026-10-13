@@ -40,8 +40,14 @@ export async function sceneToCanvas(
   scene: SceneGraph,
   canvas: Canvas,
   isCurrent: () => boolean = () => true,
+  viewport?: { width: number; height: number },
 ): Promise<void> {
-  canvas.setDimensions({ width: scene.canvas.width, height: scene.canvas.height });
+  // By default the viewport matches the scene size (unit tests, thumbnails).
+  // The editor passes the editing-area size so the Fabric viewport fills it
+  // and the scene is fitted inside via the viewport transform instead of
+  // sitting small inside a scene-sized element.
+  const dims = viewport ?? { width: scene.canvas.width, height: scene.canvas.height };
+  canvas.setDimensions({ width: dims.width, height: dims.height });
   canvas.backgroundColor = scene.canvas.background ?? 'transparent';
 
   const existing = new Map<string, FabricWithMeta>();

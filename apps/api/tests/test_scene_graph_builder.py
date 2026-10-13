@@ -38,6 +38,10 @@ def test_builds_ordered_scene_graph() -> None:
     assert graph.canvas["width"] == 200
     assert graph.canvas["height"] == 150
     assert graph.schema_version == 1
+    # background rect is centered on the canvas (center-origin convention)
+    bg = graph.layers[0]
+    assert bg.transform.x == 100
+    assert bg.transform.y == 75
     # confidence output present
     assert "overall" in graph.confidence
     assert graph.overall_confidence > 0

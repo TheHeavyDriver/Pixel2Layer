@@ -284,7 +284,7 @@ export function EditorScreen({ jobId, projectId, shareToken, templateId }: Edito
         />
 
         <main
-          className="flex min-w-0 flex-1 items-center justify-center overflow-hidden bg-canvas-drop p-4"
+          className="flex min-w-0 flex-1 items-center justify-center overflow-hidden bg-canvas-drop"
           style={{ background: '#111214' }}
         >
           <CanvasEditor

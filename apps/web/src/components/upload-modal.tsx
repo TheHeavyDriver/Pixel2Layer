@@ -134,7 +134,7 @@ export function UploadModal({ open, onClose, onUpload, multiple = false }: Uploa
                   <img
                     src={URL.createObjectURL(preview)}
                     alt="preview"
-                    className="h-12 w-16 rounded-lg border border-bordered object-cover"
+                    className="h-12 w-16 rounded-lg border border-bordered bg-raised object-contain"
                     data-testid={i === 0 ? 'upload-preview' : undefined}
                   />
                   <div className="min-w-0 flex-1">

@@ -105,7 +105,10 @@ class SceneGraphBuilder:
             id=self._uid("bg"),
             type="rectangle",
             name="Background",
-            transform=Transform(x=0, y=0),
+            # Center-origin convention (same as shapes/export): the rect must
+            # be centered on the canvas, otherwise it renders offset into a
+            # corner with the canvas background showing around it.
+            transform=Transform(x=float(image.width) / 2.0, y=float(image.height) / 2.0),
             fill=fill,
             width=float(image.width),
             height=float(image.height),

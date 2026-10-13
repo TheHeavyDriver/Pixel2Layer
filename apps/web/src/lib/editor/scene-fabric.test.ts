@@ -90,6 +90,27 @@ describe('sceneToCanvas + canvasToScene round trip', () => {
     expect(canvas.getObjects()).toHaveLength(1);
     expect(canvas.getObjects()[0].get('p2lId')).toBe('rect-1');
   });
+
+  it('sizes the viewport to the editing area while keeping scene geometry', async () => {
+    const scene = makeScene();
+    const canvas = makeCanvas();
+
+    await sceneToCanvas(scene, canvas, () => true, { width: 600, height: 600 });
+
+    // viewport fills the editing area …
+    expect(canvas.width).toBe(600);
+    expect(canvas.height).toBe(600);
+    // … but objects stay at scene coordinates
+    const readBack = canvasToScene(canvas, scene);
+    const rect = readBack.layers.find((l) => l.id === 'rect-1') as Extract<
+      SceneGraphElement,
+      { type: 'rectangle' }
+    >;
+    const origRect = scene.layers[0] as Extract<SceneGraphElement, { type: 'rectangle' }>;
+    expect(rect.transform.x).toBeCloseTo(origRect.transform.x, 0);
+    expect(rect.transform.y).toBeCloseTo(origRect.transform.y, 0);
+    expect(rect.width).toBeCloseTo(origRect.width, 0);
+  });
 });
 
 describe('fabricToElement', () => {

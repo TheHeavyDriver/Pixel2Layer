@@ -22,6 +22,7 @@ import {
   sceneToCanvas,
   type FabricWithMeta,
 } from '@/lib/editor/scene-fabric';
+import { computeContainViewport, computeWheelZoom } from '@/lib/editor/viewport';
 
 export interface CanvasEditorHandle {
   selectByIds(ids: string[]): void;
@@ -56,8 +57,14 @@ const ZOOM_STEPS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4];
 export const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
   function CanvasEditor({ scene, onChange, onSelectionChange, className }, ref) {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const containerRef = useRef<HTMLDivElement | null>(null);
     const fabricRef = useRef<Canvas | null>(null);
     const lastSyncedRef = useRef<string>('');
+    // True once the user zooms/pans manually (wheel, toolbar). While set, a
+    // container resize keeps the user's viewport instead of snapping back to
+    // fit — otherwise Ctrl+wheel zoom would be instantly cancelled by the
+    // refit. Cleared by Fit-to-screen and by every fresh scene sync (import).
+    const manualZoomRef = useRef(false);
     const sceneRef = useRef<SceneGraph>(scene);
     const onChangeRef = useRef(onChange);
     const onSelectionChangeRef = useRef(onSelectionChange);
@@ -89,26 +96,48 @@ export const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    const getViewSize = useCallback(
+      (canvas: Canvas) => {
+        const container = containerRef.current;
+        const rect = container?.getBoundingClientRect();
+        const width =
+          (rect && rect.width > 0 ? rect.width : 0) ||
+          container?.clientWidth ||
+          canvas.getElement()?.parentElement?.clientWidth ||
+          800;
+        const height =
+          (rect && rect.height > 0 ? rect.height : 0) ||
+          container?.clientHeight ||
+          canvas.getElement()?.parentElement?.clientHeight ||
+          600;
+        return { width, height };
+      },
+      [],
+    );
+
     const fitToViewport = useCallback((canvas: Canvas) => {
       // `getElement()` reads `canvas.elements.lower.el`, which is undefined
       // once the canvas has been disposed (unmount / remount / HMR). Only
       // fit the instance that is currently live.
       if (fabricRef.current !== canvas) return;
-      const el = canvas.getElement();
-      const viewW = el.clientWidth || 800;
-      const viewH = el.clientHeight || 600;
-      const scale = Math.min(
-        (viewW - 32) / (canvas.width || 1),
-        (viewH - 32) / (canvas.height || 1),
-        1,
-      );
-      canvas.absolutePan(new Point(0, 0));
-      canvas.setZoom(Math.max(0.25, scale));
-      const cx = (viewW - (canvas.width || 1) * canvas.getZoom()) / 2;
-      const cy = (viewH - (canvas.height || 1) * canvas.getZoom()) / 2;
-      canvas.absolutePan(new Point(cx, cy));
+      // The Fabric viewport fills the editing area; the scene (uploaded
+      // image) is scaled to fit inside it. Scene units stay 1:1 — only the
+      // viewport transform zooms — so editing/export coordinates are exact.
+      const { width: viewW, height: viewH } = getViewSize(canvas);
+      const sceneW = sceneRef.current.canvas.width || 900;
+      const sceneH = sceneRef.current.canvas.height || 600;
+      canvas.setDimensions({ width: viewW, height: viewH });
+      // Contain-fit: uniform scale on both axes so the whole scene is always
+      // visible — never cropped, cut, or stretched. Aspect ratio is preserved
+      // by construction (single zoom, centered letterbox, no cover-crop).
+      const { zoom, tx, ty } = computeContainViewport(viewW, viewH, sceneW, sceneH);
+      // Guard only against degenerate values; never clamp the fit itself —
+      // clamping would re-introduce cropping on very large/small uploads.
+      const safeZoom = Number.isFinite(zoom) && zoom > 0 ? Math.min(100, Math.max(0.001, zoom)) : 1;
+      canvas.setViewportTransform([safeZoom, 0, 0, safeZoom, tx, ty]);
       canvas.requestRenderAll();
-    }, []);
+      manualZoomRef.current = false;
+    }, [getViewSize]);
 
     const syncFromScene = useCallback(
       async (next: SceneGraph) => {
@@ -118,7 +147,12 @@ export const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
         const key = JSON.stringify(next);
         if (key === lastSyncedRef.current) return;
         lastSyncedRef.current = key;
-        await sceneToCanvas(next, canvas, () => fabricRef.current === canvas);
+        const container = containerRef.current;
+        const viewport =
+          container && container.clientWidth > 0 && container.clientHeight > 0
+            ? { width: container.clientWidth, height: container.clientHeight }
+            : undefined;
+        await sceneToCanvas(next, canvas, () => fabricRef.current === canvas, viewport);
         if (fabricRef.current !== canvas) return; // disposed while loading
         fitToViewport(canvas);
       },
@@ -149,16 +183,41 @@ export const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
         // wait for fabric internal state to settle before reading geometry
         setTimeout(readAndSync, 0);
       };
+      // Ctrl/Cmd + wheel zooms the canvas around the cursor (Figma-style);
+      // plain wheel pans. preventDefault keeps the browser from page-zooming
+      // or scrolling instead — only the viewport transform changes, so scene
+      // geometry (and aspect ratio) is never distorted.
+      const handleWheel = (opt: { e: WheelEvent }) => {
+        const live = fabricRef.current;
+        if (!live || fabricRef.current !== canvas) return;
+        const e = opt.e;
+        e.preventDefault();
+        if (e.ctrlKey || e.metaKey) {
+          const zoom = computeWheelZoom(live.getZoom(), e.deltaY);
+          live.zoomToPoint(new Point(e.offsetX, e.offsetY), zoom);
+        } else {
+          const vpt = live.viewportTransform;
+          if (!vpt) return;
+          const dx = e.shiftKey ? e.deltaY : e.deltaX || 0;
+          const dy = e.shiftKey ? 0 : e.deltaY;
+          vpt[4] -= dx;
+          vpt[5] -= dy;
+          live.requestRenderAll();
+        }
+        manualZoomRef.current = true;
+      };
 
       canvas.on('selection:created', reportSelection);
       canvas.on('selection:updated', reportSelection);
       canvas.on('selection:cleared', () => onSelectionChangeRef.current([]));
       canvas.on('object:modified', handleModified);
+      canvas.on('mouse:wheel', handleWheel);
       return () => {
         canvas.off('selection:created', reportSelection);
         canvas.off('selection:updated', reportSelection);
         canvas.off('selection:cleared');
         canvas.off('object:modified', handleModified);
+        canvas.off('mouse:wheel', handleWheel);
       };
     }, []);
 
@@ -166,6 +225,38 @@ export const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
     useEffect(() => {
       syncFromScene(scene);
     }, [scene, syncFromScene]);
+
+    // Refit when the editing area resizes (window resize, panel toggles).
+    // Without this the fitted zoom goes stale and the scene overflows/crops.
+    // A manual user zoom is preserved across resizes — only the canvas
+    // element is matched to the container, the viewport transform is kept.
+    useEffect(() => {
+      const container = containerRef.current;
+      const canvas = fabricRef.current;
+      if (!container || !canvas) return;
+      // The container may measure 0 on first mount; refit on the next frame.
+      const raf = requestAnimationFrame(() => {
+        const live = fabricRef.current;
+        if (live && !manualZoomRef.current) fitToViewport(live);
+      });
+      if (typeof ResizeObserver === 'undefined') return () => cancelAnimationFrame(raf);
+      const ro = new ResizeObserver(() => {
+        const live = fabricRef.current;
+        if (!live || fabricRef.current !== live) return;
+        if (manualZoomRef.current) {
+          const { width, height } = getViewSize(live);
+          live.setDimensions({ width, height });
+          live.requestRenderAll();
+        } else {
+          fitToViewport(live);
+        }
+      });
+      ro.observe(container);
+      return () => {
+        cancelAnimationFrame(raf);
+        ro.disconnect();
+      };
+    }, [fitToViewport, getViewSize]);
 
     useImperativeHandle(
       ref,
@@ -294,11 +385,12 @@ export const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
           zoom(delta: number) {
             const canvas = fabricRef.current;
             if (!canvas) return;
-            let zoom = nearestStep(canvas.getZoom() + delta);
-            const el = canvas.getElement();
-            const cx = el.clientWidth / 2;
-            const cy = el.clientHeight / 2;
+            const zoom = stepZoom(canvas.getZoom(), delta);
+            const container = containerRef.current;
+            const cx = (container?.clientWidth || 800) / 2;
+            const cy = (container?.clientHeight || 600) / 2;
             canvas.zoomToPoint(new Point(cx, cy), zoom);
+            manualZoomRef.current = true;
             canvas.requestRenderAll();
           },
 
@@ -309,7 +401,12 @@ export const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
               ...sceneRef.current,
               layers: [...sceneRef.current.layers, element],
             };
-            sceneToCanvas(sceneRef.current, canvas, () => fabricRef.current === canvas).then(
+            const container = containerRef.current;
+            const viewport =
+              container && container.clientWidth > 0 && container.clientHeight > 0
+                ? { width: container.clientWidth, height: container.clientHeight }
+                : undefined;
+            sceneToCanvas(sceneRef.current, canvas, () => fabricRef.current === canvas, viewport).then(
               () => {
                 if (fabricRef.current !== canvas) return;
                 fitToViewport(canvas);
@@ -417,21 +514,32 @@ export const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
     );
 
     return (
-      <div className={`relative h-full w-full overflow-hidden ${className ?? ''}`}>
+      <div
+        ref={containerRef}
+        className={`flex h-full w-full items-center justify-center overflow-hidden ${className ?? ''}`}
+      >
         <canvas
           ref={canvasRef}
           data-testid="editor-canvas"
-          className="absolute inset-0"
+          className="block shrink-0"
         />
       </div>
     );
   },
 );
 
-function nearestStep(current: number): number {
-  let best = ZOOM_STEPS[0];
-  for (const step of ZOOM_STEPS) {
-    if (Math.abs(step - current) < Math.abs(best - current)) best = step;
+function stepZoom(current: number, delta: number): number {
+  // Step to the next/previous rung in the direction of `delta`, so repeated
+  // +/- presses always move. (The old `nearestStep(current + delta)` could
+  // stick on the same rung when the fitted zoom sits between steps.)
+  if (delta > 0) {
+    for (const step of ZOOM_STEPS) {
+      if (step > current + 1e-9) return step;
+    }
+    return ZOOM_STEPS[ZOOM_STEPS.length - 1];
   }
-  return best;
+  for (let i = ZOOM_STEPS.length - 1; i >= 0; i--) {
+    if (ZOOM_STEPS[i] < current - 1e-9) return ZOOM_STEPS[i];
+  }
+  return ZOOM_STEPS[0];
 }
