@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 import cv2
 import numpy as np
 
-from app.services.image_utils import LoadedImage, hexify
+from app.services.image_utils import LoadedImage, hexify_bgr
 
 
 @dataclass
@@ -248,7 +248,7 @@ class ShapeDetector:
         if not np.any(erosion):
             erosion = mask
         mean = cv2.mean(image.bgr, mask=erosion)[:3]
-        return hexify(mean)
+        return hexify_bgr(mean)
 
     @staticmethod
     def _clamp(v: float) -> float:

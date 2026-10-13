@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 from sklearn.cluster import KMeans
 
-from app.services.image_utils import LoadedImage, hexify
+from app.services.image_utils import LoadedImage, hexify_bgr
 
 
 @dataclass
@@ -65,7 +65,7 @@ class ColorExtractor:
         span = pixels.max(axis=0) - pixels.min(axis=0)
         if int(span.sum()) <= 2:
             mean = pixels.mean(axis=0)
-            return [DetectedColor(hex=hexify(tuple(mean)), fraction=1.0, kind="solid")]
+            return [DetectedColor(hex=hexify_bgr(mean), fraction=1.0, kind="solid")]
 
         kmeans = KMeans(n_clusters=k, n_init=5, random_state=0)
         labels = kmeans.fit_predict(pixels.astype(np.float32))
@@ -73,7 +73,7 @@ class ColorExtractor:
         order = np.argsort(-counts)
         return [
             DetectedColor(
-                hex=hexify(tuple(kmeans.cluster_centers_[i])),
+                hex=hexify_bgr(kmeans.cluster_centers_[i]),
                 fraction=float(counts[i] / labels.size),
                 kind="solid",
             )
@@ -88,8 +88,8 @@ class ColorExtractor:
 
         # Grab the endpoints from real masked pixels.
         ys, xs = np.nonzero(mask)
-        start = hexify(tuple(patch[ys[0], xs[0], :3]))
-        end = hexify(tuple(patch[ys[-1], xs[-1], :3]))
+        start = hexify_bgr(patch[ys[0], xs[0], :3])
+        end = hexify_bgr(patch[ys[-1], xs[-1], :3])
         if start == end:
             return None
 

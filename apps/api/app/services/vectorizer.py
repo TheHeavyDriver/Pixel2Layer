@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 
-from app.services.image_utils import LoadedImage, hexify
+from app.services.image_utils import LoadedImage, hexify_bgr
 
 
 @dataclass
@@ -201,7 +201,7 @@ class Vectorizer:
             y=float(oy + height / 2),
             width=float(width),
             height=float(height),
-            fill=hexify(tuple(color)),
+            fill=hexify_bgr(color),
             confidence=confidence,
         )
 

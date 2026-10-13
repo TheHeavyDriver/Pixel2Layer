@@ -21,16 +21,26 @@ class LoadedImage:
 
 
 def load_image(data: bytes) -> LoadedImage:
-    """Decode raw image bytes into an RGBA-normalized array (preserving alpha)."""
+    """Decode raw image bytes into RGBA + BGR arrays with correct channel order.
+
+    OpenCV decodes to BGR/BGRA, so we normalize to BGRA first and then derive
+    a true RGBA and a true BGR view — getting this wrong silently swaps red
+    and blue everywhere downstream (fills, cutouts, exports).
+    """
     raw = np.frombuffer(data, dtype=np.uint8)
-    rgba = cv2.imdecode(raw, cv2.IMREAD_UNCHANGED)
-    if rgba is None:
+    decoded = cv2.imdecode(raw, cv2.IMREAD_UNCHANGED)
+    if decoded is None:
         raise ValueError("could not decode image data")
-    if rgba.ndim == 2:
-        rgba = cv2.cvtColor(rgba, cv2.COLOR_GRAY2RGBA)
-    elif rgba.shape[2] == 3:
-        rgba = cv2.cvtColor(rgba, cv2.COLOR_RGB2RGBA)
-    bgr = cv2.cvtColor(rgba, cv2.COLOR_RGBA2BGR)
+    if decoded.ndim == 2:
+        bgra = cv2.cvtColor(decoded, cv2.COLOR_GRAY2BGRA)
+    elif decoded.shape[2] == 3:
+        bgra = cv2.cvtColor(decoded, cv2.COLOR_BGR2BGRA)
+    elif decoded.shape[2] == 4:
+        bgra = decoded
+    else:
+        raise ValueError("could not decode image data")
+    rgba = cv2.cvtColor(bgra, cv2.COLOR_BGRA2RGBA)
+    bgr = cv2.cvtColor(bgra, cv2.COLOR_BGRA2BGR)
     height, width = rgba.shape[:2]
     return LoadedImage(bgr=bgr, rgba=rgba, width=width, height=height)
 
@@ -38,3 +48,9 @@ def load_image(data: bytes) -> LoadedImage:
 def hexify(rgb: tuple[int, int, int]) -> str:
     r, g, b = (int(v) for v in rgb)
     return f"#{r:02X}{g:02X}{b:02X}"
+
+
+def hexify_bgr(bgr) -> str:
+    """Format a BGR channel triple (OpenCV pixel/mean/centroid) as a hex color."""
+    b, g, r = (float(v) for v in bgr)
+    return hexify((int(round(r)), int(round(g)), int(round(b))))
