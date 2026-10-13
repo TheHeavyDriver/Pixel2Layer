@@ -37,15 +37,12 @@ export interface OutlineStyle {
   opacity: number;
 }
 
-export interface ElementBase {
+export interface ElementBase extends OutlineStyle {
   id: string;
   type: ElementType;
   name: string;
   transform: Transform;
   fill?: string;
-  stroke?: string;
-  strokeWidth?: number;
-  strokeDashArray?: number[];
   opacity: number;
   visible: boolean;
   locked: boolean;
@@ -107,22 +104,32 @@ export interface VectorElement extends ElementBase {
   height: number;
 }
 
+export interface ImageCrop {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Per-element image adjustments (v0.6 editor backlog). */
+export interface ImageFilters {
+  brightness?: number;
+  contrast?: number;
+  saturation?: number;
+  grayscale?: boolean;
+  invert?: boolean;
+  blur?: number;
+}
+
 export interface ImageElement extends ElementBase {
   type: 'image';
   /** storage reference for the source asset */
   src: string;
   width: number;
   height: number;
-  crop?: { x: number; y: number; width: number; height: number };
+  crop?: ImageCrop;
   /** per-element image adjustments (v0.6 editor backlog) */
-  filters?: {
-    brightness?: number;
-    contrast?: number;
-    saturation?: number;
-    grayscale?: boolean;
-    invert?: boolean;
-    blur?: number;
-  };
+  filters?: ImageFilters;
 }
 
 export type SceneGraphElement =

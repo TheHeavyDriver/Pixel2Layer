@@ -100,13 +100,35 @@ class VectorElement(ElementBase):
     height: float
 
 
+class ImageCrop(BaseModel):
+    x: float
+    y: float
+    width: float
+    height: float
+
+    model_config = {"populate_by_name": True}
+
+
+class ImageFilters(BaseModel):
+    brightness: float | None = None
+    contrast: float | None = None
+    saturation: float | None = None
+    grayscale: bool | None = None
+    invert: bool | None = None
+    blur: float | None = None
+
+    model_config = {"populate_by_name": True}
+
+
 class ImageElement(ElementBase):
     type: Literal["image"]
     src: str
     width: float
     height: float
-    crop: dict | None = None
-    filters: dict | None = Field(None, alias="filters")
+    crop: ImageCrop | None = None
+    filters: ImageFilters | None = Field(None, alias="filters")
+
+    model_config = {"populate_by_name": True}
 
 
 SceneGraphElement = (  # exported for type hints; pydantic discriminator below

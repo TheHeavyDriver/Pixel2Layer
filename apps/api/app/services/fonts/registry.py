@@ -50,6 +50,12 @@ def _default_families() -> list[FontFamily]:
     names are looked up (case-insensitively) against fonts installed on the
     host; entries that resolve to nothing are simply skipped at runtime, so the
     database degrades gracefully on machines with fewer fonts.
+
+    Keep in sync with the web dropdown
+    (apps/web/src/lib/design-fonts.ts `DESIGN_FONT_FAMILIES`): every family
+    here must appear there. The web list intentionally carries extra
+    proprietary system fallbacks (Arial, Georgia, Impact) this database
+    excludes.
     """
     raw = [
         # -- sans-serif ---------------------------------------------------------

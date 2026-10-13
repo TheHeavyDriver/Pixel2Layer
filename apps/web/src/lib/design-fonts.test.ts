@@ -25,8 +25,50 @@ describe('design font list', () => {
     expect(FONT_CATEGORY_LABELS.display).toBe('Display');
   });
 
-  it('contains fonts the API matcher can match', () => {
-    for (const family of ['DejaVu Sans', 'Liberation Serif', 'Noto Sans Mono']) {
+  it('contains every family the API matcher can match', () => {
+    // Mirror of `_default_families` in apps/api/app/services/fonts/registry.py.
+    // Every backend family must be selectable here; update both lists together.
+    // (Arial/Georgia/Impact are intentional frontend-only extras.)
+    const backendFamilies = [
+      'DejaVu Sans',
+      'Liberation Sans',
+      'Open Sans',
+      'Fira Sans',
+      'Ubuntu',
+      'Noto Sans',
+      'Roboto',
+      'Lato',
+      'Montserrat',
+      'Source Sans 3',
+      'Inter',
+      'Nunito',
+      'Work Sans',
+      'Carlito',
+      'DejaVu Serif',
+      'Liberation Serif',
+      'Noto Serif',
+      'Roboto Slab',
+      'Merriweather',
+      'Lora',
+      'Playfair Display',
+      'Gentium',
+      'DejaVu Sans Mono',
+      'Liberation Mono',
+      'Fira Mono',
+      'Fira Code',
+      'Noto Sans Mono',
+      'Ubuntu Mono',
+      'Roboto Mono',
+      'JetBrains Mono',
+      'Source Code Pro',
+      'Oswald',
+      'Bebas Neue',
+      'Anton',
+      'Poppins',
+      'Bitter',
+      'Archivo Black',
+    ];
+    for (const family of backendFamilies) {
       expect(DESIGN_FONT_FAMILIES.some((f) => f.family === family)).toBe(true);
     }
   });

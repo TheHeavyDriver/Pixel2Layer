@@ -70,6 +70,18 @@ def test_registry_empty_database_degrades_gracefully() -> None:
     assert r.truetype("anything", 400, 12) is None
 
 
+def test_registry_database_covers_web_dropdown() -> None:
+    # Sync guard with apps/web/src/lib/design-fonts.ts: every curated family
+    # here must exist in the web dropdown (which carries extra proprietary
+    # fallbacks Arial/Georgia/Impact on top of this list).
+    from app.services.fonts.registry import _default_families
+
+    names = [f.name for f in _default_families()]
+    assert "Carlito" in names
+    assert "Gentium" in names
+    assert len(names) == len(set(names))
+
+
 # -- matcher -------------------------------------------------------------------
 def test_matcher_empty_content_yields_no_match() -> None:
     m = FontMatcher(_registry())

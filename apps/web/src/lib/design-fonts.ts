@@ -9,10 +9,13 @@ export interface DesignFontEntry {
 /**
  * Curated font selection for the text properties panel.
  *
- * Mirrors the families the API font database can match during OCR
- * reconstruction (see apps/api/app/services/fonts/registry.py). Named families
- * fall back to whichever local font the browser substitutes; the generic
- * families always render.
+ * Must stay in sync with the API font database
+ * (see apps/api/app/services/fonts/registry.py `_default_families`): every
+ * family in the backend database must appear here so matched fonts stay
+ * selectable. `Arial`, `Georgia`, and `Impact` are intentional frontend-only
+ * extras (proprietary system fonts the open-license backend matcher excludes).
+ * Named families fall back to whichever local font the browser substitutes;
+ * the generic families always render.
  */
 export const DESIGN_FONT_FAMILIES: DesignFontEntry[] = [
   // generic fallbacks first
@@ -34,6 +37,7 @@ export const DESIGN_FONT_FAMILIES: DesignFontEntry[] = [
   { family: 'Inter', category: 'sans', generic: 'sans-serif' },
   { family: 'Nunito', category: 'sans', generic: 'sans-serif' },
   { family: 'Work Sans', category: 'sans', generic: 'sans-serif' },
+  { family: 'Carlito', category: 'sans', generic: 'sans-serif' },
   // serif
   { family: 'Georgia', category: 'serif', generic: 'serif' },
   { family: 'DejaVu Serif', category: 'serif', generic: 'serif' },
@@ -43,6 +47,7 @@ export const DESIGN_FONT_FAMILIES: DesignFontEntry[] = [
   { family: 'Merriweather', category: 'serif', generic: 'serif' },
   { family: 'Lora', category: 'serif', generic: 'serif' },
   { family: 'Playfair Display', category: 'serif', generic: 'serif' },
+  { family: 'Gentium', category: 'serif', generic: 'serif' },
   // monospace
   { family: 'DejaVu Sans Mono', category: 'mono', generic: 'monospace' },
   { family: 'Liberation Mono', category: 'mono', generic: 'monospace' },
