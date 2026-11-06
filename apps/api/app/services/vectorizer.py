@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 
-from app.services.image_utils import LoadedImage, hexify_bgr
+from app.services.image_utils import LoadedImage, estimate_background_color, hexify_bgr
 
 
 @dataclass
@@ -69,7 +69,7 @@ class Vectorizer:
         light-on-dark ones (the v1.1 target). Photographic regions are left to
         the Segmenter.
         """
-        background = _background_color(image.bgr)
+        background = estimate_background_color(image.bgr)
         palette = self._pick_palette(image.bgr, background)
 
         # Nearest-centroid labels: every pixel belongs to exactly one palette
@@ -271,21 +271,3 @@ class Vectorizer:
                 ),
             )
         )
-
-
-def _background_color(bgr: np.ndarray) -> np.ndarray:
-    """Robust estimate of the background via the image border."""
-    h, w = bgr.shape[:2]
-    edge = 4
-    if h < 8 or w < 8:
-        samples = bgr.reshape(-1, 3)
-    else:
-        samples = np.concatenate(
-            [
-                bgr[:edge, :, :].reshape(-1, 3),
-                bgr[-edge:, :, :].reshape(-1, 3),
-                bgr[:, :edge, :].reshape(-1, 3),
-                bgr[:, -edge:, :].reshape(-1, 3),
-            ]
-        )
-    return np.median(samples, axis=0)

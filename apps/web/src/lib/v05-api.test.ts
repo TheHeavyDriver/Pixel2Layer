@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { SCENE_GRAPH_SCHEMA_VERSION } from '@pixel2layer/schema';
+
 import {
   API_BASE,
   createBatch,
@@ -22,7 +24,7 @@ describe('sharing/templates/batches api client', () => {
   const fetchMock = vi.fn();
   globalThis.fetch = fetchMock as unknown as typeof fetch;
 
-  const scene = { schemaVersion: 1, layers: [] };
+  const scene = { schemaVersion: SCENE_GRAPH_SCHEMA_VERSION, layers: [] };
 
   beforeEach(() => {
     window.localStorage.clear();

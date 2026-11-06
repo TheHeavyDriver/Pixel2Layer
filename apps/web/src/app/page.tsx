@@ -4,13 +4,14 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { BatchProgressScreen } from '@/components/batch-progress-screen';
+import { NavBar } from '@/components/layout/nav-bar';
+import { extractErrorMessage } from '@/lib/error-utils';
 import { ProgressScreen } from '@/components/progress-screen';
 import { UploadModal } from '@/components/upload-modal';
 import {
   createBatch,
   createJob,
   getCurrentUser,
-  logout,
   uploadImage,
   type AuthUser,
   type Batch,
@@ -55,7 +56,7 @@ export default function Home() {
         setActiveBatch(batch);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Upload failed.');
+      setError(extractErrorMessage(e, 'Upload failed.'));
     } finally {
       setBatchBusy(false);
     }
@@ -80,43 +81,9 @@ export default function Home() {
   }
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-base px-4">
-      <nav className="fixed top-0 flex w-full max-w-6xl items-center justify-between px-6 py-4">
-        <div className="flex items-center gap-2">
-          <span className="h-5 w-5 rounded-[4px] bg-accent" aria-hidden />
-          <span className="text-[15px] font-semibold tracking-[-0.02em]">Pixel2Layer</span>
-        </div>
-        <div className="flex items-center gap-2">
-          {user ? (
-            <>
-              <button
-                type="button"
-                onClick={() => router.push('/dashboard')}
-                className="h-9 rounded-[10px] border border-bordered px-4 text-[13px] font-medium text-secondary transition-colors hover:bg-raised"
-              >
-                My projects
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  logout();
-                  setUser(null);
-                }}
-                className="h-9 rounded-[10px] px-3 text-[13px] font-medium text-secondary transition-colors hover:bg-raised"
-              >
-                Log out
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={() => router.push('/login')}
-              className="h-9 rounded-[10px] border border-bordered px-4 text-[13px] font-medium text-secondary transition-colors hover:bg-raised"
-            >
-              Sign in
-            </button>
-          )}
-        </div>
-      </nav>
+      <div className="fixed top-0 w-full max-w-6xl px-6 py-4">
+        <NavBar user={user} onUserChange={setUser} showTemplatesLink />
+      </div>
 
       <div className="pt-16">
         <h1 className="max-w-2xl text-center text-[40px] font-semibold leading-tight tracking-[-0.02em]">

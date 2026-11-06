@@ -3,25 +3,17 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { NavBar } from '@/components/layout/nav-bar';
 import {
   deleteProject,
   getCurrentUser,
   listProjects,
-  logout,
   updateProject,
   type AuthUser,
   type ProjectSummary,
 } from '@/lib/api';
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
+import { extractErrorMessage } from '@/lib/error-utils';
+import { formatDate } from '@/lib/utils';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -45,7 +37,7 @@ export default function DashboardPage() {
       try {
         setProjects(await listProjects());
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Failed to load projects.');
+        setError(extractErrorMessage(e, 'Failed to load projects.'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -63,7 +55,7 @@ export default function DashboardPage() {
         await deleteProject(id);
         setProjects((prev) => prev.filter((p) => p.id !== id));
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Delete failed.');
+        setError(extractErrorMessage(e, 'Delete failed.'));
       }
     },
     [],
@@ -85,7 +77,7 @@ export default function DashboardPage() {
         await updateProject(id, { name });
         setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, name } : p)));
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Rename failed.');
+        setError(extractErrorMessage(e, 'Rename failed.'));
       } finally {
         setRenamingId(null);
       }
@@ -111,37 +103,9 @@ export default function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-base px-6 py-6">
-      <nav className="mx-auto flex w-full max-w-4xl items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="h-5 w-5 rounded-[4px] bg-accent" aria-hidden />
-          <span className="text-[15px] font-semibold tracking-[-0.02em]">Pixel2Layer</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => router.push('/')}
-            className="h-9 rounded-[10px] border border-bordered px-4 text-[13px] font-medium text-secondary transition-colors hover:bg-raised"
-          >
-            New from image
-          </button>
-          {user && (
-            <>
-              <span className="hidden text-[13px] text-secondary sm:inline">{user.email}</span>
-              <button
-                type="button"
-                onClick={() => {
-                  logout();
-                  router.push('/');
-                }}
-                className="h-9 rounded-[10px] px-3 text-[13px] font-medium text-secondary transition-colors hover:bg-raised"
-                data-testid="logout-btn"
-              >
-                Log out
-              </button>
-            </>
-          )}
-        </div>
-      </nav>
+      <NavBar user={user} onUserChange={(newUser) => {
+        if (!newUser) router.push('/');
+      }} />
 
       <div className="mx-auto mt-10 max-w-4xl">
         <h1 className="text-[28px] font-semibold tracking-[-0.02em]">Your projects</h1>

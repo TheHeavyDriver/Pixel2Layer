@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.api.deps import CurrentUserDep, StoreDep
+from app.api.utils import iso_format, require_ownership
 from app.services.store import Template
 
 router = APIRouter(prefix="/api/templates", tags=["templates"])
@@ -34,10 +35,6 @@ class TemplateSummary(BaseModel):
     createdAt: str
 
 
-def _iso(dt) -> str:
-    return dt.isoformat().replace("+00:00", "Z")
-
-
 def _template_response(
     t: Template, include_scene: bool = True
 ) -> TemplateResponse | TemplateSummary:
@@ -47,7 +44,7 @@ def _template_response(
             ownerId=t.owner_id,
             name=t.name,
             sourceImage=t.source_image,
-            createdAt=_iso(t.created_at),
+            createdAt=iso_format(t.created_at),
         )
     return TemplateResponse(
         id=t.id,
@@ -55,7 +52,7 @@ def _template_response(
         name=t.name,
         sceneGraph=t.scene_graph,
         sourceImage=t.source_image,
-        createdAt=_iso(t.created_at),
+        createdAt=iso_format(t.created_at),
     )
 
 
@@ -94,7 +91,5 @@ async def delete_template(
     user: CurrentUserDep,
     store: StoreDep,
 ) -> None:
-    template = await store.get_template(template_id)
-    if template is None or template.owner_id != user.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="template not found")
+    template = require_ownership(await store.get_template(template_id), user, "template")
     await store.delete_template(template.id)

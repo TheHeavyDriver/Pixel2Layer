@@ -105,6 +105,108 @@ class VisionTextDetector:
             )
         return results
 
+    def _compute_ink_metrics(
+        self, contour: np.ndarray, bbox: tuple[int, int, int, int]
+    ) -> dict:
+        """Compute structural metrics from an ink map inside the given bbox.
+
+        Returns a dict with: density, col_fill_ratio, empty_col_count,
+        row_coverage, row_variation, longest_empty_band.
+        These metrics characterize whether the region contains text-like
+        glyph structure.
+        """
+        x, y, w, h = bbox
+        if contour.size == 0:
+            return {}
+        
+        sub = contour
+        sub_h = sub.shape[0]
+        
+        density = float(sub.mean())
+        
+        # Ink columns must be substantially filled: glyph stems span the line height
+        sub_col_ink = sub.sum(axis=0)
+        ink_cols = sub_col_ink[sub_col_ink > 0]
+        col_fill_ratio = (
+            float(ink_cols.mean() / sub_h) if ink_cols.size > 0 else 0.0
+        )
+        
+        empty_col_count = int((sub_col_ink == 0).sum())
+        
+        # Strokes spanning the line height
+        row_coverage = float((sub.sum(axis=1) > 0).mean())
+        
+        # Row variation: glyph rows vary in ink load (crossbars, stems, letter gaps)
+        sub_rows = sub.sum(axis=1).astype(np.float64)
+        row_variation = float(np.std(sub_rows) / max(1.0, sub_rows.mean()))
+        
+        # Long horizontal voids mean stacked blocks (grid/brick textures)
+        zero_rows = (sub.sum(axis=1) == 0).astype(np.int8)
+        longest = current = 0
+        for flag_row in zero_rows:
+            current = current + 1 if flag_row else 0
+            longest = max(longest, current)
+        longest_empty_band = longest
+        
+        return {
+            "density": density,
+            "col_fill_ratio": col_fill_ratio,
+            "empty_col_count": empty_col_count,
+            "row_coverage": row_coverage,
+            "row_variation": row_variation,
+            "longest_empty_band": longest_empty_band,
+        }
+
+    def _validate_glyph_structure(self, metrics: dict, min_row_var: float) -> bool:
+        """Validate that structural metrics match text glyph patterns.
+
+        Text has:
+        - Moderate ink density (not too sparse or too busy)
+        - Substantially filled ink columns (stems span line height)
+        - Clean inter-character gaps (empty columns)
+        - Strokes spanning most of the line height
+        - Varying row profile (not uniform like shapes/textures)
+        - No long horizontal empty bands (stacked blocks/grids)
+
+        Returns True if all checks pass.
+        """
+        if not metrics:
+            return False
+        
+        density = metrics.get("density", 0.0)
+        if not 0.025 <= density <= 0.60:
+            return False  # too sparse (edges of a solid) or too busy (noise)
+        
+        col_fill_ratio = metrics.get("col_fill_ratio", 0.0)
+        if col_fill_ratio < 0.15:
+            return False  # glyph stems don't span line height
+        
+        empty_col_count = metrics.get("empty_col_count", 0)
+        if empty_col_count < 2:
+            return False  # no clean gaps between characters
+        
+        row_coverage = metrics.get("row_coverage", 0.0)
+        if row_coverage < 0.4:
+            return False  # strokes do not fill the line height
+        
+        row_variation = metrics.get("row_variation", 0.0)
+        if row_variation < min_row_var:
+            return False  # uniform profile (ring/ellipse/bar field)
+        
+        longest_empty_band = metrics.get("longest_empty_band", 0)
+        if longest_empty_band > 12:
+            return False  # stacked blocks (grid/brick textures)
+        
+        return True
+
+    def _validate_aspect_ratio(self, w: int, h: int) -> bool:
+        """Check if width and height are reasonable for a text region.
+
+        Text regions should be at least 12px wide and 6px tall
+        to contain readable glyphs.
+        """
+        return w >= 12 and h >= 6
+
     def _text_like_bbox(
         self, gray: np.ndarray, x: int, y: int, w: int, h: int
     ) -> tuple[int, int, int, int] | None:
@@ -172,7 +274,7 @@ class VisionTextDetector:
 
         The bbox is first trimmed to rows/cols that actually carry ink so
         regions inflated by background texture validate against the glyphs
-        only.
+        only. Then structural metrics are computed and validated.
         """
         # Trim to rows/cols carrying meaningful ink (>=2% of the busiest).
         row_ink = ink_bool.sum(axis=1)
@@ -183,46 +285,14 @@ class VisionTextDetector:
         cols = np.flatnonzero(col_ink >= max(1, 0.02 * int(col_ink.max())))
         tx, ty = x + int(cols[0]), y + int(rows[0])
         tw, th = int(cols[-1] - cols[0] + 1), int(rows[-1] - rows[0] + 1)
-        if tw < 12 or th < 6:
+        
+        if not self._validate_aspect_ratio(tw, th):
             return None
+        
         sub = ink_bool[rows[0] : rows[-1] + 1, cols[0] : cols[-1] + 1]
-        sub_h = sub.shape[0]
-
-        density = float(sub.mean())
-        if not 0.025 <= density <= 0.60:
-            return None  # too sparse (edges of a solid) or too busy (noise)
-
-        # Ink columns must be substantially filled: glyph stems span the line
-        # height, while the mere outline of a circle/rectangle/texture does not.
-        sub_col_ink = sub.sum(axis=0)
-        ink_cols = sub_col_ink[sub_col_ink > 0]
-        if ink_cols.size == 0 or float(ink_cols.mean() / sub_h) < 0.15:
-            return None
-
-        if int((sub_col_ink == 0).sum()) < 2:
-            return None  # no clean gaps between characters
-
-        if float((sub.sum(axis=1) > 0).mean()) < 0.4:
-            return None  # strokes do not fill the line height
-
-        # Glyph rows vary in ink load (crossbars, stems, letter gaps); the
-        # near-constant-per-row profile of a ring/ellipse outline or uniform
-        # bar field is structure-free. The border-referenced map needs the
-        # stricter bar: grid/ring patterns profile at ~0.15-0.18 there while
-        # real display text stays at 0.21+.
-        sub_rows = sub.sum(axis=1).astype(np.float64)
-        row_variation = float(np.std(sub_rows) / max(1.0, sub_rows.mean()))
-        if row_variation < min_row_var:
-            return None
-
-        # Long horizontal voids mean stacked blocks (grid/brick textures),
-        # not a text line; real line gaps stay under ~12px inside a region.
-        zero_rows = (sub.sum(axis=1) == 0).astype(np.int8)
-        longest = current = 0
-        for flag_row in zero_rows:
-            current = current + 1 if flag_row else 0
-            longest = max(longest, current)
-        if longest > 12:
+        
+        metrics = self._compute_ink_metrics(sub, (tx, ty, tw, th))
+        if not self._validate_glyph_structure(metrics, min_row_var):
             return None
 
         return tx, ty, tw, th

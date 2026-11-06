@@ -3,7 +3,7 @@ from __future__ import annotations
 import cv2
 import numpy as np
 
-from app.services.image_utils import load_image
+from app.services.image_utils import load_image, estimate_background_color
 from app.services.segmenter import VisionSegmenter, _color_distance, _fixed_mask
 from app.services.vectorizer import Vectorizer
 from tests.fixtures import make_poster, to_png_bytes
@@ -68,7 +68,7 @@ def test_segmenter_recovers_low_contrast_foreground_via_adaptive_fallback() -> N
 
     assert VisionSegmenter(min_region_area=100, bg_tolerance=28)._extract_regions(
         _fixed_mask(
-            _color_distance(image.bgr, VisionSegmenter._background_color(image.bgr)),
+            _color_distance(image.bgr, estimate_background_color(image.bgr)),
             28,
         ),
         confidence=0.55,

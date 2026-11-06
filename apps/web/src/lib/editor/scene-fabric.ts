@@ -453,8 +453,9 @@ export async function loadImageElement(
       top: element.transform.y,
       originX: 'center',
       originY: 'center',
-      scaleX: (element.transform.scaleX || 1) * (element.width / (img.width || 1)),
-      scaleY: (element.transform.scaleY || 1) * (element.height / (img.height || 1)),
+      // Display image at its natural size (1:1 pixels) - no scaling
+      scaleX: element.transform.scaleX || 1,
+      scaleY: element.transform.scaleY || 1,
       angle: element.transform.rotation,
       opacity: element.opacity,
       visible: element.visible,

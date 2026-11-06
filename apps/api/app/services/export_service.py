@@ -8,6 +8,7 @@ from PIL import Image, ImageChops, ImageDraw, ImageFont
 
 from app.schemas.scene_graph import SceneGraph, SceneGraphElement
 from app.services.fonts.registry import FontRegistry, default_font_registry
+from app.services.svg_path_parser import flatten_subpaths
 
 
 class ExportError(ValueError):
@@ -145,7 +146,7 @@ class ExportService:
         punched out instead of over-filled. Single-subpath paths keep the fast
         plain polygon fill.
         """
-        subpaths = _flatten_subpaths(
+        subpaths = flatten_subpaths(
             elem.path, samples_per_unit=128 if scale > 4 else 64
         )
         subpaths = [p for p in subpaths if len(p) >= 3]
@@ -273,164 +274,6 @@ class ExportService:
         except Exception as exc:  # noqa: BLE001
             raise ExportError(f"invalid scene graph in .p2l: {exc}") from exc
         return scene, payload.get("metadata", {})
-
-
-def _flatten_subpaths(
-    d: str, samples_per_unit: int = 64
-) -> list[list[tuple[float, float]]]:
-    """Flatten an SVG path (M/L/C/Q/A/Z) into per-subpath point lists.
-
-    Every top-level `M` starts a new subpath (our vectorizer emits hole
-    interiors as extra `M…Z` segments), so consumers can apply even-odd fill.
-    """
-    import math
-
-    tokens = d.replace(",", " ").split()
-    if not tokens:
-        return []
-    subpaths: list[list[tuple[float, float]]] = []
-    out: list[tuple[float, float]] = []
-    cur = (0.0, 0.0)
-    start: tuple[float, float] | None = None
-    i = 0
-    cmd = "M"
-
-    def num(i: int) -> float:
-        return float(tokens[i])
-
-    while i < len(tokens):
-        token = tokens[i]
-        if token.isalpha():
-            cmd = token
-            i += 1
-            continue
-        if cmd == "M":
-            x, y = num(i), num(i + 1)
-            i += 2
-            if out:
-                subpaths.append(out)
-                out = []
-            out.append((x, y))
-            start = (x, y)
-            cur = (x, y)
-        elif cmd == "L":
-            x, y = num(i), num(i + 1)
-            i += 2
-            out.append((x, y))
-            cur = (x, y)
-        elif cmd == "C":
-            c1x, c1y, c2x, c2y = num(i), num(i + 1), num(i + 2), num(i + 3)
-            x, y = num(i + 4), num(i + 5)
-            i += 6
-            n = max(4, int(samples_per_unit * math.hypot(x - cur[0], y - cur[1])))
-            for t in range(1, n + 1):
-                u = t / n
-                mu = 1 - u
-                px = (
-                    mu**3 * cur[0]
-                    + 3 * mu**2 * u * c1x
-                    + 3 * mu * u**2 * c2x
-                    + u**3 * x
-                )
-                py = (
-                    mu**3 * cur[1]
-                    + 3 * mu**2 * u * c1y
-                    + 3 * mu * u**2 * c2y
-                    + u**3 * y
-                )
-                out.append((px, py))
-            cur = (x, y)
-        elif cmd == "Q":
-            qx, qy = num(i), num(i + 1)
-            x, y = num(i + 2), num(i + 3)
-            i += 4
-            n = max(4, int(samples_per_unit * math.hypot(x - cur[0], y - cur[1])))
-            for t in range(1, n + 1):
-                u = t / n
-                mu = 1 - u
-                px = mu**2 * cur[0] + 2 * mu * u * qx + u**2 * x
-                py = mu**2 * cur[1] + 2 * mu * u * qy + u**2 * y
-                out.append((px, py))
-            cur = (x, y)
-        elif cmd == "A":
-            rx, ry, rot = num(i), num(i + 1), num(i + 2)
-            laf, sf = int(num(i + 3)), int(num(i + 4))
-            x, y = num(i + 5), num(i + 6)
-            i += 7
-            pts = _arc_points(cur, (x, y), rx, ry, rot, laf, sf)
-            out.extend(pts)
-            cur = (x, y)
-        elif cmd == "Z":
-            if start and out and start != out[-1]:
-                out.append(start)
-                cur = start
-            i += 1
-        else:
-            raise ValueError(f"unsupported SVG command: {cmd}")
-    if out:
-        subpaths.append(out)
-    return subpaths
-
-
-def _arc_points(
-    start: tuple[float, float],
-    end: tuple[float, float],
-    rx: float,
-    ry: float,
-    rot: float,
-    large: int,
-    sweep: int,
-) -> list[tuple[float, float]]:
-    """Flatten an SVG elliptical arc to line segments (endpoint→center form)."""
-    import math
-
-    rx, ry = abs(rx), abs(ry)
-    if rx == 0 or ry == 0:
-        return [end]
-    phi = math.radians(rot % 360)
-    cos_phi, sin_phi = math.cos(phi), math.sin(phi)
-    x1, y1 = start
-    x2, y2 = end
-    dx = (x1 - x2) / 2
-    dy = (y1 - y2) / 2
-    x1p = cos_phi * dx + sin_phi * dy
-    y1p = -sin_phi * dx + cos_phi * dy
-    lam = (x1p * x1p) / (rx * rx) + (y1p * y1p) / (ry * ry)
-    if lam > 1:
-        s = math.sqrt(lam)
-        rx, ry = rx * s, ry * s
-    rx2, ry2 = rx * rx, ry * ry
-    denom = rx2 * y1p * y1p + ry2 * x1p * x1p
-    if abs(denom) < 1e-12:
-        return [end]
-    num = rx2 * ry2 - rx2 * y1p * y1p - ry2 * x1p * x1p
-    coef = math.sqrt(max(0.0, num / denom))
-    if large == sweep:
-        coef = -coef
-    cxp = coef * (rx * y1p / ry)
-    cyp = coef * -(ry * x1p / rx)
-    cx = cos_phi * cxp - sin_phi * cyp + (x1 + x2) / 2
-    cy = sin_phi * cxp + cos_phi * cyp + (y1 + y2) / 2
-
-    def angle(ux, uy, vx, vy):
-        dot = ux * vx + uy * vy
-        det = ux * vy - uy * vx
-        return math.atan2(det, dot)
-
-    theta1 = angle(1.0, 0.0, (x1p - cxp) / rx, (y1p - cyp) / ry)
-    delta = angle((x1p - cxp) / rx, (y1p - cyp) / ry, (-x1p - cxp) / rx, (-y1p - cyp) / ry)
-    if sweep == 0 and delta > 0:
-        delta -= 2 * math.pi
-    if sweep == 1 and delta < 0:
-        delta += 2 * math.pi
-    steps = max(8, min(128, int(abs(delta) / (math.pi / 48))))
-    pts: list[tuple[float, float]] = []
-    for k in range(1, steps + 1):
-        t = theta1 + delta * k / steps
-        x = cx + rx * math.cos(t) * cos_phi - ry * math.sin(t) * sin_phi
-        y = cy + rx * math.cos(t) * sin_phi + ry * math.sin(t) * cos_phi
-        pts.append((x, y))
-    return pts
 
 
 def _parse_hex(value: str) -> tuple[int, int, int]:

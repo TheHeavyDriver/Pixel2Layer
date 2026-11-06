@@ -13,7 +13,7 @@ from PIL import Image
 from app.schemas.scene_graph import ImageElement, Transform
 from app.services.color_extractor import ColorExtractor
 from app.services.fonts.matching import FontMatcher
-from app.services.image_utils import LoadedImage, hexify_bgr, load_image
+from app.services.image_utils import LoadedImage, estimate_background_color, hexify_bgr, load_image
 from app.services.progressive import ImageComplexity, ProgressiveRouter
 from app.services.scene_graph_builder import DetectedElements, SceneGraphBuilder
 from app.services.segmenter import build_segmenter
@@ -189,13 +189,4 @@ def mean_border_hex(bgr: NDArray) -> str | None:
     h, w = bgr.shape[:2]
     if h < 8 or w < 8:
         return None
-    edge = 4
-    samples = np.concatenate(
-        [
-            bgr[:edge, :, :].reshape(-1, 3),
-            bgr[-edge:, :, :].reshape(-1, 3),
-            bgr[:, :edge, :].reshape(-1, 3),
-            bgr[:, -edge:, :].reshape(-1, 3),
-        ]
-    )
-    return hexify_bgr(samples.mean(axis=0))
+    return hexify_bgr(estimate_background_color(bgr, use_mean=True))

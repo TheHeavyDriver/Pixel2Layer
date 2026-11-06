@@ -7,7 +7,23 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from app.services.image_utils import LoadedImage
+from app.services.image_utils import LoadedImage, estimate_background_color
+
+# Segmentation thresholds
+# Minimum area (in pixels²) for a segmented region to be kept.
+# Filters out tiny noise regions that aren't meaningful foreground objects.
+# Set lower than shape detection threshold since segmentation captures more detail.
+DEFAULT_MIN_REGION_AREA = 200
+
+# Maximum number of foreground regions to extract from a single image.
+# Prevents excessive processing time on highly fragmented images while capturing
+# the most significant objects. Regions are processed largest-first.
+DEFAULT_MAX_REGIONS = 40
+
+# Color distance threshold (in BGR color space) for fixed-tolerance background separation.
+# Pixels further than this distance from the estimated background color are considered
+# foreground. Lower values = stricter separation, higher = more permissive.
+DEFAULT_BG_TOLERANCE = 28
 
 
 @dataclass
@@ -48,9 +64,9 @@ class VisionSegmenter(SegmenterBackend):
 
     def __init__(
         self,
-        min_region_area: float = 200.0,
-        max_regions: int = 40,
-        bg_tolerance: int = 28,
+        min_region_area: float = DEFAULT_MIN_REGION_AREA,
+        max_regions: int = DEFAULT_MAX_REGIONS,
+        bg_tolerance: int = DEFAULT_BG_TOLERANCE,
         grabcut_iterations: int = 3,
     ) -> None:
         self.min_region_area = min_region_area
@@ -62,7 +78,7 @@ class VisionSegmenter(SegmenterBackend):
         return True
 
     def segment(self, image: LoadedImage) -> list[SegmentedRegion]:
-        background = self._background_color(image.bgr)
+        background = estimate_background_color(image.bgr)
         dist = _color_distance(image.bgr, background)
 
         # Attempt 1: fixed-tolerance separation from the border color.
@@ -122,25 +138,6 @@ class VisionSegmenter(SegmenterBackend):
                 )
             )
         return regions
-
-    @staticmethod
-    def _background_color(bgr: np.ndarray) -> np.ndarray:
-        """Robust estimate of the background via the image border."""
-        h, w = bgr.shape[:2]
-        edge = 4
-        if h < 8 or w < 8:
-            samples = bgr.reshape(-1, 3)
-        else:
-            samples = np.concatenate(
-                [
-                    bgr[:edge, :, :].reshape(-1, 3),
-                    bgr[-edge:, :, :].reshape(-1, 3),
-                    bgr[:, :edge, :].reshape(-1, 3),
-                    bgr[:, -edge:, :].reshape(-1, 3),
-                ]
-            )
-        med = np.median(samples, axis=0)
-        return med
 
     def _grabcut_mask(self, image: LoadedImage) -> np.ndarray | None:
         """Foreground mask via GrabCut, border strip as sure-background."""

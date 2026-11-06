@@ -2,6 +2,11 @@ from __future__ import annotations
 
 import re
 
+from app.core.constants import (
+    FONT_SCORE_MAX_PENALTY,
+    TEXT_EMPTY_PENALTY,
+    TEXT_UNMATCHED_FONT_PENALTY,
+)
 from app.schemas.scene_graph import SceneGraphElement
 
 _FONT_MATCH = re.compile(r"matched \(score ([0-9.]+)\)")
@@ -21,15 +26,17 @@ def _score_text(elem: SceneGraphElement) -> float:
     penalty = 0.0
     note = elem.confidence_note or ""
     if not elem.content.strip():
-        penalty = 0.4
+        penalty = TEXT_EMPTY_PENALTY
     else:
         score_match = _FONT_MATCH.search(note)
         if score_match:
             # Confidence in the font grows linearly with the silhouette IoU.
             font_score = float(score_match.group(1))
-            penalty = max(0.0, round(0.18 - 0.18 * font_score, 3))
+            penalty = max(
+                0.0, round(FONT_SCORE_MAX_PENALTY - FONT_SCORE_MAX_PENALTY * font_score, 3)
+            )
         elif "font" in note.lower():
-            penalty = 0.15
+            penalty = TEXT_UNMATCHED_FONT_PENALTY
     return max(0.0, min(1.0, elem.confidence - penalty))
 
 

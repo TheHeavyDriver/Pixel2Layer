@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.api.deps import CurrentUserDep, StoreDep
+from app.api.utils import iso_format, require_ownership
 from app.services.store import Project, Share
 
 router = APIRouter(prefix="/api", tags=["sharing"])
@@ -33,17 +34,13 @@ class SharedProjectResponse(BaseModel):
     updatedAt: str
 
 
-def _iso(dt) -> str:
-    return dt.isoformat().replace("+00:00", "Z")
-
-
 def _share_response(share: Share) -> ShareResponse:
     return ShareResponse(
         token=share.token,
         projectId=share.project_id,
         permission=share.permission,
         url=f"/share/{share.token}",
-        createdAt=_iso(share.created_at),
+        createdAt=iso_format(share.created_at),
     )
 
 
@@ -54,7 +51,7 @@ def _shared_project_response(project: Project, permission: str) -> SharedProject
         sceneGraph=project.scene_graph,
         sourceImage=project.source_image,
         permission=permission,
-        updatedAt=_iso(project.updated_at),
+        updatedAt=iso_format(project.updated_at),
     )
 
 
@@ -69,9 +66,7 @@ async def create_share(
     user: CurrentUserDep,
     store: StoreDep,
 ) -> ShareResponse:
-    project = await store.get_project(project_id)
-    if project is None or project.owner_id != user.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
+    project = require_ownership(await store.get_project(project_id), user, "project")
     share = await store.create_share(
         project_id=project.id,
         owner_id=user.id,
@@ -87,9 +82,7 @@ async def list_shares(
     user: CurrentUserDep,
     store: StoreDep,
 ) -> list[ShareResponse]:
-    project = await store.get_project(project_id)
-    if project is None or project.owner_id != user.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
+    project = require_ownership(await store.get_project(project_id), user, "project")
     shares = await store.list_shares(project.id)
     return [_share_response(s) for s in shares]
 
@@ -104,9 +97,7 @@ async def revoke_share(
     user: CurrentUserDep,
     store: StoreDep,
 ) -> None:
-    project = await store.get_project(project_id)
-    if project is None or project.owner_id != user.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
+    project = require_ownership(await store.get_project(project_id), user, "project")
     await store.delete_share(project.id, token)
 
 

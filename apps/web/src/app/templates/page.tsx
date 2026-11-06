@@ -3,24 +3,18 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { NavBar } from '@/components/layout/nav-bar';
 import {
   createProject,
   deleteTemplate,
   getCurrentUser,
   getToken,
   listTemplates,
-  logout,
   type AuthUser,
   type TemplateSummary,
 } from '@/lib/api';
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
+import { extractErrorMessage } from '@/lib/error-utils';
+import { formatDate } from '@/lib/utils';
 
 export default function TemplatesPage() {
   const router = useRouter();
@@ -38,7 +32,7 @@ export default function TemplatesPage() {
       try {
         setTemplates(await listTemplates());
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load templates.');
+        if (!cancelled) setError(extractErrorMessage(e, 'Failed to load templates.'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -65,7 +59,7 @@ export default function TemplatesPage() {
           router.push(`/editor?template=${t.id}`);
         }
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Could not open template.');
+        setError(extractErrorMessage(e, 'Could not open template.'));
         setBusyId(null);
       }
     },
@@ -79,7 +73,7 @@ export default function TemplatesPage() {
         await deleteTemplate(t.id);
         setTemplates((prev) => prev.filter((x) => x.id !== t.id));
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Delete failed.');
+        setError(extractErrorMessage(e, 'Delete failed.'));
       }
     },
     [],
@@ -87,50 +81,7 @@ export default function TemplatesPage() {
 
   return (
     <main className="min-h-screen bg-base px-6 py-6">
-      <nav className="mx-auto flex w-full max-w-5xl items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="h-5 w-5 rounded-[4px] bg-accent" aria-hidden />
-          <span className="text-[15px] font-semibold tracking-[-0.02em]">Pixel2Layer</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => router.push('/')}
-            className="h-9 rounded-[10px] border border-bordered px-4 text-[13px] font-medium text-secondary transition-colors hover:bg-raised"
-          >
-            New from image
-          </button>
-          {user ? (
-            <>
-              <button
-                type="button"
-                onClick={() => router.push('/dashboard')}
-                className="h-9 rounded-[10px] border border-bordered px-4 text-[13px] font-medium text-secondary transition-colors hover:bg-raised"
-              >
-                My projects
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  logout();
-                  setUser(null);
-                }}
-                className="h-9 rounded-[10px] px-3 text-[13px] font-medium text-secondary transition-colors hover:bg-raised"
-              >
-                Log out
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={() => router.push('/login?redirect=/templates')}
-              className="h-9 rounded-[10px] border border-bordered px-4 text-[13px] font-medium text-secondary transition-colors hover:bg-raised"
-            >
-              Sign in
-            </button>
-          )}
-        </div>
-      </nav>
+      <NavBar user={user} onUserChange={setUser} />
 
       <div className="mx-auto mt-10 max-w-5xl">
         <h1 className="text-[28px] font-semibold tracking-[-0.02em]">Template gallery</h1>

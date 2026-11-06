@@ -5,6 +5,8 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 
+from app.core.exceptions import ImageDecodeError
+
 
 @dataclass
 class LoadedImage:
@@ -30,7 +32,7 @@ def load_image(data: bytes) -> LoadedImage:
     raw = np.frombuffer(data, dtype=np.uint8)
     decoded = cv2.imdecode(raw, cv2.IMREAD_UNCHANGED)
     if decoded is None:
-        raise ValueError("could not decode image data")
+        raise ImageDecodeError("could not decode image data")
     if decoded.ndim == 2:
         bgra = cv2.cvtColor(decoded, cv2.COLOR_GRAY2BGRA)
     elif decoded.shape[2] == 3:
@@ -38,7 +40,7 @@ def load_image(data: bytes) -> LoadedImage:
     elif decoded.shape[2] == 4:
         bgra = decoded
     else:
-        raise ValueError("could not decode image data")
+        raise ImageDecodeError("could not decode image data")
     rgba = cv2.cvtColor(bgra, cv2.COLOR_BGRA2RGBA)
     bgr = cv2.cvtColor(bgra, cv2.COLOR_BGRA2BGR)
     height, width = rgba.shape[:2]
@@ -54,3 +56,35 @@ def hexify_bgr(bgr) -> str:
     """Format a BGR channel triple (OpenCV pixel/mean/centroid) as a hex color."""
     b, g, r = (float(v) for v in bgr)
     return hexify((int(round(r)), int(round(g)), int(round(b))))
+
+
+def estimate_background_color(bgr: np.ndarray, use_mean: bool = False) -> np.ndarray:
+    """Estimate background color from the image border.
+    
+    Samples a 4-pixel border strip around the image edges and returns the
+    aggregated BGR color. For very small images (< 8px either dimension), 
+    samples the entire image instead.
+    
+    Args:
+        bgr: BGR image array (H, W, 3)
+        use_mean: If True, uses mean; if False (default), uses median
+    
+    Returns:
+        BGR color triple as np.ndarray of shape (3,)
+    """
+    h, w = bgr.shape[:2]
+    edge = 4
+    if h < 8 or w < 8:
+        samples = bgr.reshape(-1, 3)
+    else:
+        samples = np.concatenate(
+            [
+                bgr[:edge, :, :].reshape(-1, 3),
+                bgr[-edge:, :, :].reshape(-1, 3),
+                bgr[:, :edge, :].reshape(-1, 3),
+                bgr[:, -edge:, :].reshape(-1, 3),
+            ]
+        )
+    if use_mean:
+        return samples.mean(axis=0)
+    return np.median(samples, axis=0)

@@ -1,3 +1,5 @@
+import { SCENE_GRAPH_SCHEMA_VERSION } from '@pixel2layer/schema';
+
 export interface UploadResponse {
   uploadId: string;
   key: string;
@@ -46,6 +48,14 @@ async function handle<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function handleBlob(res: Response): Promise<Blob> {
+  if (!res.ok) {
+    const detail = await res.json().catch(() => null);
+    throw new Error(detail?.detail ?? `Request failed (${res.status})`);
+  }
+  return res.blob();
+}
+
 export async function uploadImage(file: File): Promise<UploadResponse> {
   const form = new FormData();
   form.append('file', file);
@@ -53,11 +63,7 @@ export async function uploadImage(file: File): Promise<UploadResponse> {
     method: 'POST',
     body: form,
   });
-  if (!res.ok) {
-    const detail = await res.json().catch(() => null);
-    throw new Error(detail?.detail ?? `Upload failed (${res.status})`);
-  }
-  return res.json();
+  return handle<UploadResponse>(res);
 }
 
 export async function createJob(uploadId: string): Promise<JobResponse> {
@@ -66,19 +72,12 @@ export async function createJob(uploadId: string): Promise<JobResponse> {
     headers: JSON_HEADERS,
     body: JSON.stringify({ upload_id: uploadId }),
   });
-  if (!res.ok) {
-    const detail = await res.json().catch(() => null);
-    throw new Error(detail?.detail ?? `Job creation failed (${res.status})`);
-  }
-  return res.json();
+  return handle<JobResponse>(res);
 }
 
 export async function getJob(jobId: string): Promise<JobResponse> {
   const res = await fetch(`${API_BASE}/api/jobs/${jobId}`);
-  if (!res.ok) {
-    throw new Error(`Job lookup failed (${res.status})`);
-  }
-  return res.json();
+  return handle<JobResponse>(res);
 }
 
 export interface ExportOptions {
@@ -106,7 +105,7 @@ export async function exportScene(
     format: scene.format,
     scan: 1,
     scene: {
-      schemaVersion: 1,
+      schemaVersion: SCENE_GRAPH_SCHEMA_VERSION,
       canvas: scene.canvas,
       layers: scene.layers,
       confidence: scene.confidence ?? {},
@@ -118,12 +117,8 @@ export async function exportScene(
     headers: JSON_HEADERS,
     body: JSON.stringify(body),
   });
-  if (!res.ok) {
-    const detail = await res.json().catch(() => null);
-    throw new Error(detail?.detail ?? `Export failed (${res.status})`);
-  }
   void download;
-  return res.blob();
+  return handleBlob(res);
 }
 
 /** Download a .p2l project file for a scene graph. */
@@ -133,7 +128,7 @@ export async function saveProjectP2l(
 ): Promise<Blob> {
   const body = {
     scene: {
-      schemaVersion: 1,
+      schemaVersion: SCENE_GRAPH_SCHEMA_VERSION,
       canvas: scene.canvas,
       layers: scene.layers,
       confidence: scene.confidence ?? {},
@@ -146,11 +141,7 @@ export async function saveProjectP2l(
     headers: JSON_HEADERS,
     body: JSON.stringify(body),
   });
-  if (!res.ok) {
-    const detail = await res.json().catch(() => null);
-    throw new Error(detail?.detail ?? `Save failed (${res.status})`);
-  }
-  return res.blob();
+  return handleBlob(res);
 }
 
 /** Read an uploaded .p2l file and return its scene graph. */
@@ -161,11 +152,7 @@ export async function importProjectP2l(file: Blob): Promise<Record<string, unkno
     method: 'POST',
     body: form,
   });
-  if (!res.ok) {
-    const detail = await res.json().catch(() => null);
-    throw new Error(detail?.detail ?? `Import failed (${res.status})`);
-  }
-  return res.json();
+  return handle<Record<string, unknown>>(res);
 }
 
 // -- auth -------------------------------------------------------------------
@@ -209,11 +196,7 @@ async function authRequest(path: string, method: string, body: unknown): Promise
     headers: JSON_HEADERS,
     body: JSON.stringify(body),
   });
-  if (!res.ok) {
-    const detail = await res.json().catch(() => null);
-    throw new Error(detail?.detail ?? `${path} failed (${res.status})`);
-  }
-  const parsed = (await res.json()) as AuthResponse;
+  const parsed = await handle<AuthResponse>(res);
   setToken(parsed.token);
   return parsed;
 }
@@ -429,11 +412,7 @@ export async function updateSharedProject(
     headers: JSON_HEADERS,
     body: JSON.stringify({ sceneGraph }),
   });
-  if (!res.ok) {
-    const detail = await res.json().catch(() => null);
-    throw new Error(detail?.detail ?? `Share update failed (${res.status})`);
-  }
-  return res.json();
+  return handle<SharedProject>(res);
 }
 
 // -- templates --------------------------------------------------------------
@@ -521,11 +500,7 @@ export async function removeBackground(file: Blob): Promise<BackgroundRemovalRes
     method: 'POST',
     body: form,
   });
-  if (!res.ok) {
-    const detail = await res.json().catch(() => null);
-    throw new Error(detail?.detail ?? `Background removal failed (${res.status})`);
-  }
-  return res.json();
+  return handle<BackgroundRemovalResult>(res);
 }
 
 /** Ask the API for smart layer-grouping suggestions on a scene graph. */
@@ -535,7 +510,7 @@ export async function suggestGroups(scene: {
 }): Promise<GroupSuggestion[]> {
   const body = {
     scene: {
-      schemaVersion: 1,
+      schemaVersion: SCENE_GRAPH_SCHEMA_VERSION,
       canvas: scene.canvas,
       layers: scene.layers,
       confidence: {},
@@ -547,11 +522,7 @@ export async function suggestGroups(scene: {
     headers: JSON_HEADERS,
     body: JSON.stringify(body),
   });
-  if (!res.ok) {
-    const detail = await res.json().catch(() => null);
-    throw new Error(detail?.detail ?? `Grouping failed (${res.status})`);
-  }
-  const parsed = (await res.json()) as { groups: GroupSuggestion[] };
+  const parsed = await handle<{ groups: GroupSuggestion[] }>(res);
   return parsed.groups;
 }
 
@@ -583,11 +554,7 @@ export async function detectRegions(file: Blob): Promise<RegionsResult> {
     method: 'POST',
     body: form,
   });
-  if (!res.ok) {
-    const detail = await res.json().catch(() => null);
-    throw new Error(detail?.detail ?? `Region detection failed (${res.status})`);
-  }
-  return res.json();
+  return handle<RegionsResult>(res);
 }
 
 async function regionEdit(
@@ -600,11 +567,7 @@ async function regionEdit(
   const form = new FormData();
   form.append('file', file, 'image.png');
   const res = await fetch(url, { method: 'POST', body: form });
-  if (!res.ok) {
-    const detail = await res.json().catch(() => null);
-    throw new Error(detail?.detail ?? `${endpoint} failed (${res.status})`);
-  }
-  return res.json();
+  return handle<BackgroundRemovalResult>(res);
 }
 
 /** Crop an image to a single detected region's bounding box. */

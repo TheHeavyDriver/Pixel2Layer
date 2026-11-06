@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-import { STAGES, type JobResponse, type Stage } from '@/lib/api';
+import { getJob, subscribeToJob, STAGES, type JobResponse, type Stage } from '@/lib/api';
+import { extractErrorMessage } from '@/lib/error-utils';
 
 interface ProgressScreenProps {
   jobId: string;
@@ -41,7 +42,7 @@ export function ProgressScreen({ jobId, onDone, onCancel }: ProgressScreenProps)
         const final = await stream;
         if (!cancelled) onDone(final.status === 'done' ? (job ?? final) : final);
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Reconstruction failed.');
+        if (!cancelled) setError(extractErrorMessage(e, 'Reconstruction failed.'));
       }
     });
 

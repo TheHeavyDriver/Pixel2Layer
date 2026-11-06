@@ -5,9 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import { register } from '@/lib/api';
-
-const inputCls =
-  'h-10 w-full rounded-[10px] border border-bordered bg-raised px-3 text-[13px] text-primary outline-none transition-colors placeholder:text-muted focus:border-accent';
+import { INPUT_CLASS_NAME } from '@/lib/utils';
 
 function SignupForm() {
   const router = useRouter();
@@ -42,7 +40,7 @@ function SignupForm() {
           placeholder="Name (optional)"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className={inputCls}
+          className={INPUT_CLASS_NAME}
           autoComplete="name"
         />
         <input
@@ -51,7 +49,7 @@ function SignupForm() {
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className={inputCls}
+          className={INPUT_CLASS_NAME}
           autoComplete="email"
         />
         <input
@@ -61,7 +59,7 @@ function SignupForm() {
           placeholder="Password (8+ characters)"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className={inputCls}
+          className={INPUT_CLASS_NAME}
           autoComplete="new-password"
         />
         {error && <p className="text-[12px] text-danger" role="alert">{error}</p>}

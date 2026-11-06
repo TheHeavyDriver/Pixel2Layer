@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.api.deps import CurrentUserDep, StoreDep
+from app.api.utils import iso_format, require_ownership
 from app.services.store import Project, ProjectVersion, User
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
@@ -53,18 +54,14 @@ class VersionResponse(BaseModel):
     createdAt: str
 
 
-def _iso(dt) -> str:
-    return dt.isoformat().replace("+00:00", "Z")
-
-
 def _project_response(p: Project) -> ProjectResponse:
     return ProjectResponse(
         id=p.id,
         name=p.name,
         sceneGraph=p.scene_graph,
         sourceImage=p.source_image,
-        createdAt=_iso(p.created_at),
-        updatedAt=_iso(p.updated_at),
+        createdAt=iso_format(p.created_at),
+        updatedAt=iso_format(p.updated_at),
     )
 
 
@@ -73,8 +70,8 @@ def _summary(p: Project) -> ProjectSummary:
         id=p.id,
         name=p.name,
         sourceImage=p.source_image,
-        createdAt=_iso(p.created_at),
-        updatedAt=_iso(p.updated_at),
+        createdAt=iso_format(p.created_at),
+        updatedAt=iso_format(p.updated_at),
     )
 
 
@@ -85,16 +82,8 @@ def _version_response(v: ProjectVersion) -> VersionResponse:
         versionNo=v.version_no,
         label=v.label,
         sceneGraph=v.scene_graph,
-        createdAt=_iso(v.created_at),
+        createdAt=iso_format(v.created_at),
     )
-
-
-def _owned_or_404(project: Project | None, user: User) -> Project:
-    if project is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
-    if project.owner_id != user.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
-    return project
 
 
 @router.post("", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
@@ -125,7 +114,7 @@ async def get_project(
     store: StoreDep,
 ) -> ProjectResponse:
     project = await store.get_project(project_id)
-    return _project_response(_owned_or_404(project, user))
+    return _project_response(require_ownership(project, user, "project"))
 
 
 @router.patch("/{project_id}", response_model=ProjectResponse)
@@ -135,7 +124,7 @@ async def update_project(
     user: CurrentUserDep,
     store: StoreDep,
 ) -> ProjectResponse:
-    project = _owned_or_404(await store.get_project(project_id), user)
+    project = require_ownership(await store.get_project(project_id), user, "project")
     updated = await store.update_project(
         project.id, name=req.name, scene_graph=req.sceneGraph
     )
@@ -148,7 +137,7 @@ async def delete_project(
     user: CurrentUserDep,
     store: StoreDep,
 ) -> None:
-    project = _owned_or_404(await store.get_project(project_id), user)
+    project = require_ownership(await store.get_project(project_id), user, "project")
     await store.delete_project(project.id)
 
 
@@ -163,7 +152,7 @@ async def save_version(
     user: CurrentUserDep,
     store: StoreDep,
 ) -> VersionResponse:
-    project = _owned_or_404(await store.get_project(project_id), user)
+    project = require_ownership(await store.get_project(project_id), user, "project")
     version = await store.create_version(
         project_id=project.id, scene_graph=req.sceneGraph, label=req.label
     )
@@ -176,7 +165,7 @@ async def list_versions(
     user: CurrentUserDep,
     store: StoreDep,
 ) -> list[VersionResponse]:
-    project = _owned_or_404(await store.get_project(project_id), user)
+    project = require_ownership(await store.get_project(project_id), user, "project")
     versions = await store.list_versions(project.id)
     return [_version_response(v) for v in versions]
 
@@ -191,7 +180,7 @@ async def restore_version(
     user: CurrentUserDep,
     store: StoreDep,
 ) -> ProjectResponse:
-    project = _owned_or_404(await store.get_project(project_id), user)
+    project = require_ownership(await store.get_project(project_id), user, "project")
     restored = await store.restore_version(project.id, version_no)
     if restored is None:
         raise HTTPException(

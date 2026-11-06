@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { SCENE_GRAPH_SCHEMA_VERSION } from '@pixel2layer/schema';
+
 import {
   API_BASE,
   createProject,
@@ -81,7 +83,7 @@ describe('auth + projects api client', () => {
 
   it('createProject posts a bearer-authed JSON body', async () => {
     setToken('tok-5');
-    const scene = { schemaVersion: 1, layers: [] };
+    const scene = { schemaVersion: SCENE_GRAPH_SCHEMA_VERSION, layers: [] };
     fetchMock.mockResolvedValueOnce(jsonResponse({ id: 'p1', name: 'Poster', sceneGraph: scene }, 201));
 
     const out = await createProject('Poster', scene);

@@ -100,8 +100,6 @@ class ColorExtractor:
 
         if not (x_ok or y_ok):
             return None
-        if not (x_ok or y_ok):
-            return None
         if x_ok and (not y_ok or abs(x_slope) >= abs(y_slope)):
             angle = 0.0
         else:

@@ -8,6 +8,17 @@ import numpy as np
 
 from app.services.image_utils import LoadedImage, hexify_bgr
 
+# Shape detection thresholds
+# Minimum area (in pixels²) for a detected shape to be considered valid.
+# Filters out noise and very small artifacts that aren't meaningful design elements.
+DEFAULT_MIN_AREA = 60.0
+
+# Maximum number of shape candidates to process from the image.
+# Prevents performance degradation on images with thousands of contours (e.g., 
+# highly textured photos or complex illustrations). The most prominent shapes
+# are typically found first due to contour ordering.
+DEFAULT_MAX_CANDIDATES = 500
+
 
 @dataclass
 class DetectedShape:
@@ -26,8 +37,8 @@ class ShapeDetector:
 
     def __init__(
         self,
-        min_area: float = 60.0,
-        max_candidates: int = 500,
+        min_area: float = DEFAULT_MIN_AREA,
+        max_candidates: int = DEFAULT_MAX_CANDIDATES,
     ) -> None:
         self.min_area = min_area
         self.max_candidates = max_candidates

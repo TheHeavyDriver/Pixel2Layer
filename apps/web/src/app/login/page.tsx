@@ -5,9 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import { login } from '@/lib/api';
-
-const inputCls =
-  'h-10 w-full rounded-[10px] border border-bordered bg-raised px-3 text-[13px] text-primary outline-none transition-colors placeholder:text-muted focus:border-accent';
+import { INPUT_CLASS_NAME } from '@/lib/utils';
 
 function LoginForm() {
   const router = useRouter();
@@ -42,7 +40,7 @@ function LoginForm() {
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className={inputCls}
+          className={INPUT_CLASS_NAME}
           autoComplete="email"
         />
         <input
@@ -51,7 +49,7 @@ function LoginForm() {
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className={inputCls}
+          className={INPUT_CLASS_NAME}
           autoComplete="current-password"
         />
         {error && <p className="text-[12px] text-danger" role="alert">{error}</p>}

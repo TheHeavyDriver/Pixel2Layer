@@ -1,3 +1,4 @@
+import { SCENE_GRAPH_SCHEMA_VERSION } from '@pixel2layer/schema';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -71,19 +72,19 @@ describe('api client', () => {
   });
 
   it('importProjectP2l posts a multipart file', async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse({ schemaVersion: 1, layers: [] }, 200));
+    fetchMock.mockResolvedValueOnce(jsonResponse({ schemaVersion: SCENE_GRAPH_SCHEMA_VERSION, layers: [] }, 200));
 
     const out = await importProjectP2l(new Blob(['{}'], { type: 'application/json' }));
 
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect((init.body as FormData).get('file')).toBeInstanceOf(Blob);
-    expect(out).toEqual({ schemaVersion: 1, layers: [] });
+    expect(out).toEqual({ schemaVersion: SCENE_GRAPH_SCHEMA_VERSION, layers: [] });
   });
 
   it('getJob propagates non-2xx as a descriptive error', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ detail: 'Not found' }, 404));
 
-    await expect(getJob('missing')).rejects.toThrow('Job lookup failed (404)');
+    await expect(getJob('missing')).rejects.toThrow('Not found');
   });
 
   it('removeBackground posts the file and returns the masked result', async () => {

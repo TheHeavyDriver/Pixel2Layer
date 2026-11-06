@@ -1,8 +1,9 @@
 import type { SceneGraph } from '@pixel2layer/schema';
+import { SCENE_GRAPH_SCHEMA_VERSION } from '@pixel2layer/schema';
 
 export function makeScene(overrides: Partial<SceneGraph> = {}): SceneGraph {
   return {
-    schemaVersion: 1,
+    schemaVersion: SCENE_GRAPH_SCHEMA_VERSION,
     canvas: { width: 300, height: 200, background: '#F0F0F0' },
     layers: [
       {

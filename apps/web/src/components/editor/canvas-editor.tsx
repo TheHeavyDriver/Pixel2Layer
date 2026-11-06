@@ -120,24 +120,15 @@ export const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
       // once the canvas has been disposed (unmount / remount / HMR). Only
       // fit the instance that is currently live.
       if (fabricRef.current !== canvas) return;
-      // The Fabric viewport fills the editing area; the scene (uploaded
-      // image) is scaled to fit inside it. Scene units stay 1:1 — only the
-      // viewport transform zooms — so editing/export coordinates are exact.
-      const { width: viewW, height: viewH } = getViewSize(canvas);
+      // Set canvas to original scene dimensions (1:1 pixel ratio)
       const sceneW = sceneRef.current.canvas.width || 900;
       const sceneH = sceneRef.current.canvas.height || 600;
-      canvas.setDimensions({ width: viewW, height: viewH });
-      // Contain-fit: uniform scale on both axes so the whole scene is always
-      // visible — never cropped, cut, or stretched. Aspect ratio is preserved
-      // by construction (single zoom, centered letterbox, no cover-crop).
-      const { zoom, tx, ty } = computeContainViewport(viewW, viewH, sceneW, sceneH);
-      // Guard only against degenerate values; never clamp the fit itself —
-      // clamping would re-introduce cropping on very large/small uploads.
-      const safeZoom = Number.isFinite(zoom) && zoom > 0 ? Math.min(100, Math.max(0.001, zoom)) : 1;
-      canvas.setViewportTransform([safeZoom, 0, 0, safeZoom, tx, ty]);
+      canvas.setDimensions({ width: sceneW, height: sceneH });
+      // Identity transform: no scaling, scene displays at original size
+      canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
       canvas.requestRenderAll();
       manualZoomRef.current = false;
-    }, [getViewSize]);
+    }, []);
 
     const syncFromScene = useCallback(
       async (next: SceneGraph) => {
@@ -185,16 +176,30 @@ export const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
       };
       // Ctrl/Cmd + wheel zooms the canvas around the cursor (Figma-style);
       // plain wheel pans. preventDefault keeps the browser from page-zooming
-      // or scrolling instead — only the viewport transform changes, so scene
-      // geometry (and aspect ratio) is never distorted.
+      // or scrolling instead. Canvas element stays at original document size;
+      // only the viewport transform changes (zoom is a "camera" effect).
       const handleWheel = (opt: { e: WheelEvent }) => {
         const live = fabricRef.current;
         if (!live || fabricRef.current !== canvas) return;
         const e = opt.e;
         e.preventDefault();
         if (e.ctrlKey || e.metaKey) {
-          const zoom = computeWheelZoom(live.getZoom(), e.deltaY);
-          live.zoomToPoint(new Point(e.offsetX, e.offsetY), zoom);
+          const currentZoom = live.getZoom();
+          const newZoom = computeWheelZoom(currentZoom, e.deltaY);
+          // Zoom around cursor position in viewport coordinates
+          const vpt = live.viewportTransform;
+          if (vpt) {
+            // Convert mouse position to scene coordinates at current zoom
+            const sceneX = (e.offsetX - vpt[4]) / vpt[0];
+            const sceneY = (e.offsetY - vpt[5]) / vpt[3];
+            // Apply new zoom with cursor as anchor point
+            live.setViewportTransform([
+              newZoom, 0, 0, newZoom,
+              e.offsetX - sceneX * newZoom,
+              e.offsetY - sceneY * newZoom
+            ]);
+            live.requestRenderAll();
+          }
         } else {
           const vpt = live.viewportTransform;
           if (!vpt) return;
@@ -227,36 +232,18 @@ export const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
     }, [scene, syncFromScene]);
 
     // Refit when the editing area resizes (window resize, panel toggles).
-    // Without this the fitted zoom goes stale and the scene overflows/crops.
-    // A manual user zoom is preserved across resizes — only the canvas
-    // element is matched to the container, the viewport transform is kept.
+    // Canvas stays at original image dimensions (1:1 pixel ratio).
     useEffect(() => {
       const container = containerRef.current;
       const canvas = fabricRef.current;
       if (!container || !canvas) return;
-      // The container may measure 0 on first mount; refit on the next frame.
+      // Initial fit on mount
       const raf = requestAnimationFrame(() => {
         const live = fabricRef.current;
         if (live && !manualZoomRef.current) fitToViewport(live);
       });
-      if (typeof ResizeObserver === 'undefined') return () => cancelAnimationFrame(raf);
-      const ro = new ResizeObserver(() => {
-        const live = fabricRef.current;
-        if (!live || fabricRef.current !== live) return;
-        if (manualZoomRef.current) {
-          const { width, height } = getViewSize(live);
-          live.setDimensions({ width, height });
-          live.requestRenderAll();
-        } else {
-          fitToViewport(live);
-        }
-      });
-      ro.observe(container);
-      return () => {
-        cancelAnimationFrame(raf);
-        ro.disconnect();
-      };
-    }, [fitToViewport, getViewSize]);
+      return () => cancelAnimationFrame(raf);
+    }, [fitToViewport]);
 
     useImperativeHandle(
       ref,
@@ -385,11 +372,22 @@ export const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
           zoom(delta: number) {
             const canvas = fabricRef.current;
             if (!canvas) return;
-            const zoom = stepZoom(canvas.getZoom(), delta);
+            const currentZoom = canvas.getZoom();
+            const newZoom = stepZoom(currentZoom, delta);
+            // Keep canvas at original document size, only change viewport transform
+            const sceneW = sceneRef.current.canvas.width || 900;
+            const sceneH = sceneRef.current.canvas.height || 600;
             const container = containerRef.current;
             const cx = (container?.clientWidth || 800) / 2;
             const cy = (container?.clientHeight || 600) / 2;
-            canvas.zoomToPoint(new Point(cx, cy), zoom);
+            // Calculate center point in scene coordinates
+            const vpt = canvas.viewportTransform;
+            if (vpt) {
+              const sceneCx = (cx - vpt[4]) / vpt[0];
+              const sceneCy = (cy - vpt[5]) / vpt[3];
+              // Apply new zoom while keeping canvas dimensions fixed
+              canvas.setViewportTransform([newZoom, 0, 0, newZoom, cx - sceneCx * newZoom, cy - sceneCy * newZoom]);
+            }
             manualZoomRef.current = true;
             canvas.requestRenderAll();
           },
@@ -516,7 +514,7 @@ export const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(
     return (
       <div
         ref={containerRef}
-        className={`flex h-full w-full items-center justify-center overflow-hidden ${className ?? ''}`}
+        className={`flex h-full w-full items-start justify-start overflow-auto bg-gray-200 ${className ?? ''}`}
       >
         <canvas
           ref={canvasRef}
